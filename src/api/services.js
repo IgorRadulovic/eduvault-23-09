@@ -8,7 +8,7 @@ function toAppUser(u, e={}) { return { id:u.uid, name:u.displayName??u.email.spl
 function persistUser(u) { try { localStorage.setItem(USER_KEY, JSON.stringify(u)); } catch {} }
 function clearUser() { try { localStorage.removeItem(USER_KEY); } catch {} }
 export function getStoredUser() { try { return JSON.parse(localStorage.getItem(USER_KEY)); } catch { return null; } }
-function friendlyErr(code) { return ({'auth/user-not-found':'No account found with this email.','auth/wrong-password':'Incorrect password.','auth/invalid-credential':'Invalid email or password.','auth/email-already-in-use':'An account with this email already exists.','auth/weak-password':'Password must be at least 6 characters.','auth/invalid-email':'Please enter a valid email address.','auth/too-many-requests':'Too many attempts. Try again later.','auth/network-request-failed':'Network error. Check your connection.','auth/popup-blocked':'Popup blocked — allow popups or use email sign-in.','auth/popup-closed-by-user':null,'auth/cancelled-popup-request':null,'auth/unauthorized-domain':'Add this domain in Firebase → Authentication → Authorised Domains.'}[code]??`Sign-in error (${code}).`); }
+function friendlyErr(code) { return ({'auth/user-not-found':'No account found with this email.','auth/wrong-password':'Incorrect password.','auth/invalid-credential':'Invalid email or password.','auth/email-already-in-use':'An account with this email already exists.','auth/weak-password':'Password must be at least 6 characters.','auth/invalid-email':'Please enter a valid email address.','auth/too-many-requests':'Too many attempts. Try again later.','auth/network-request-failed':'Network error. Check your connection.','auth/popup-blocked':'Popup blocked. Redirecting to Google sign-in...','auth/popup-closed-by-user':'Google sign-in was cancelled before it finished.','auth/cancelled-popup-request':'Google sign-in was cancelled before it finished.','auth/operation-not-allowed':'Google sign-in is not enabled in Firebase Authentication. Enable Google under Sign-in providers.','auth/operation-not-supported-in-this-environment':'This browser blocked the Google pop-up. Redirecting to Google sign-in...','auth/unauthorized-domain':'This domain is not authorized in Firebase. Add your published domain under Firebase Authentication settings.','auth/invalid-api-key':'Firebase is using an invalid API key. Check the VITE_FIREBASE_API_KEY deployment variable.'}[code]??`Sign-in error (${code}).`); }
 async function syncUser(u, e={}) { try { await supabase.from('users').upsert({ id:u.uid, email:u.email, name:u.displayName??u.email.split('@')[0], avatar_url:u.photoURL??null, role:e.role??'student', status:'active' },{ onConflict:'id' }); } catch {} }
 function requireFirebase() {
   if (!FIREBASE_CONFIGURED || !auth) {
@@ -39,7 +39,13 @@ export async function authLoginWithGoogle() {
   requireFirebase();
   try {
     try { const { user }=await signInWithPopup(auth,googleProvider); const u=toAppUser(user); await syncUser(user); persistUser(u); return u; }
-    catch (pe) { if (pe.code==='auth/popup-blocked') { await signInWithRedirect(auth,googleProvider); return null; } if (pe.code==='auth/popup-closed-by-user') return null; throw pe; }
+    catch (pe) {
+      if (['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment'].includes(pe.code)) {
+        await signInWithRedirect(auth,googleProvider);
+        return null;
+      }
+      throw pe;
+    }
   } catch (err) { const msg=friendlyErr(err.code); if (!msg) return null; throw new Error(msg); }
 }
 export async function authLogout() { if (auth) await signOut(auth); clearUser(); }

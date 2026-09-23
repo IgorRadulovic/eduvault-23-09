@@ -35,6 +35,13 @@
 
   --navy:           #0D1B2A;
   --navy-mid:       #1A3550;
+  --footer-bg:      #0D1B2A;
+  --footer-bg2:     #10243A;
+  --footer-text:    rgba(255,255,255,.78);
+  --footer-muted:   rgba(255,255,255,.58);
+  --footer-faint:   rgba(255,255,255,.38);
+  --footer-border:  rgba(255,255,255,.11);
+  --footer-chip:    rgba(255,255,255,.08);
 
   --border:         #D4E0EE;
   --border2:        #B8CEDE;
@@ -93,6 +100,13 @@
 
   --navy:           #E8F0F9;
   --navy-mid:       #8BAAC8;
+  --footer-bg:      #050B13;
+  --footer-bg2:     #0A1624;
+  --footer-text:    rgba(232,240,249,.84);
+  --footer-muted:   rgba(139,170,200,.72);
+  --footer-faint:   rgba(139,170,200,.5);
+  --footer-border:  rgba(139,170,200,.18);
+  --footer-chip:    rgba(139,170,200,.1);
 
   --border:         #1E3550;
   --border2:        #2A4A6A;
