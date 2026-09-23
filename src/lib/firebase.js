@@ -16,26 +16,33 @@ const firebaseConfig = {
   measurementId:     import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
-// Validate required config
-const missing = Object.entries(firebaseConfig)
-  .filter(([k, v]) => !v && k !== 'measurementId')
-  .map(([k]) => k);
+const requiredKeys = ['apiKey', 'authDomain', 'projectId', 'appId'];
+const missing = requiredKeys
+  .filter(key => !firebaseConfig[key]);
 
 if (missing.length > 0) {
   console.warn('[Firebase] Missing config values:', missing.join(', '));
 }
 
-const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+export const FIREBASE_CONFIGURED = missing.length === 0;
 
-export const auth = getAuth(app);
+const app = FIREBASE_CONFIGURED
+  ? (getApps().length ? getApps()[0] : initializeApp(firebaseConfig))
+  : null;
 
-setPersistence(auth, browserLocalPersistence).catch(console.error);
+export const auth = app ? getAuth(app) : null;
+
+if (auth) {
+  setPersistence(auth, browserLocalPersistence).catch(console.error);
+}
 
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.addScope('email');
 googleProvider.addScope('profile');
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
-isSupported().then(ok => { if (ok) getAnalytics(app); }).catch(() => {});
+if (app) {
+  isSupported().then(ok => { if (ok) getAnalytics(app); }).catch(() => {});
+}
 
 export default app;

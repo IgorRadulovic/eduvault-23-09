@@ -1,5 +1,5 @@
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, sendPasswordResetEmail, updateProfile, onAuthStateChanged } from 'firebase/auth';
-import { auth, googleProvider } from '../lib/firebase';
+import { FIREBASE_CONFIGURED, auth, googleProvider } from '../lib/firebase';
 import { supabase } from '../lib/supabase';
 import { MOCK_PRODUCTS, MOCK_ORDERS, MOCK_COUPONS, MOCK_USERS } from './mockData';
 
@@ -10,27 +10,41 @@ function clearUser() { try { localStorage.removeItem(USER_KEY); } catch {} }
 export function getStoredUser() { try { return JSON.parse(localStorage.getItem(USER_KEY)); } catch { return null; } }
 function friendlyErr(code) { return ({'auth/user-not-found':'No account found with this email.','auth/wrong-password':'Incorrect password.','auth/invalid-credential':'Invalid email or password.','auth/email-already-in-use':'An account with this email already exists.','auth/weak-password':'Password must be at least 6 characters.','auth/invalid-email':'Please enter a valid email address.','auth/too-many-requests':'Too many attempts. Try again later.','auth/network-request-failed':'Network error. Check your connection.','auth/popup-blocked':'Popup blocked — allow popups or use email sign-in.','auth/popup-closed-by-user':null,'auth/cancelled-popup-request':null,'auth/unauthorized-domain':'Add this domain in Firebase → Authentication → Authorised Domains.'}[code]??`Sign-in error (${code}).`); }
 async function syncUser(u, e={}) { try { await supabase.from('users').upsert({ id:u.uid, email:u.email, name:u.displayName??u.email.split('@')[0], avatar_url:u.photoURL??null, role:e.role??'student', status:'active' },{ onConflict:'id' }); } catch {} }
+function requireFirebase() {
+  if (!FIREBASE_CONFIGURED || !auth) {
+    throw new Error('Authentication is not configured for this deployment yet.');
+  }
+}
 
 export function onAuthStateChange(callback) {
+  if (!FIREBASE_CONFIGURED || !auth) {
+    clearUser();
+    callback(null);
+    return () => {};
+  }
   getRedirectResult(auth).then(async r => { if (r?.user) { const u=toAppUser(r.user); await syncUser(r.user); persistUser(u); callback(u); } }).catch(()=>{});
   return onAuthStateChanged(auth, async fbUser => { if (fbUser) { const u=toAppUser(fbUser); persistUser(u); callback(u); } else { clearUser(); callback(null); } });
 }
 export async function authLogin({ email, password }) {
+  requireFirebase();
   try { const { user }=await signInWithEmailAndPassword(auth,email,password); const u=toAppUser(user); await syncUser(user); persistUser(u); return u; }
   catch (err) { throw new Error(friendlyErr(err.code)??err.message); }
 }
 export async function authSignup({ name, email, password }) {
+  requireFirebase();
   try { const { user }=await createUserWithEmailAndPassword(auth,email,password); await updateProfile(user,{ displayName:name }); await user.reload(); const u={ ...toAppUser(user), name }; await syncUser(user,{ role:'student' }); persistUser(u); return u; }
   catch (err) { throw new Error(friendlyErr(err.code)??err.message); }
 }
 export async function authLoginWithGoogle() {
+  requireFirebase();
   try {
     try { const { user }=await signInWithPopup(auth,googleProvider); const u=toAppUser(user); await syncUser(user); persistUser(u); return u; }
     catch (pe) { if (pe.code==='auth/popup-blocked') { await signInWithRedirect(auth,googleProvider); return null; } if (pe.code==='auth/popup-closed-by-user') return null; throw pe; }
   } catch (err) { const msg=friendlyErr(err.code); if (!msg) return null; throw new Error(msg); }
 }
-export async function authLogout() { await signOut(auth); clearUser(); }
+export async function authLogout() { if (auth) await signOut(auth); clearUser(); }
 export async function authForgotPassword({ email }) {
+  requireFirebase();
   try { await sendPasswordResetEmail(auth,email,{ url:`${window.location.origin}/login` }); return { message:'Password reset email sent.' }; }
   catch (err) { throw new Error(friendlyErr(err.code)??err.message); }
 }
