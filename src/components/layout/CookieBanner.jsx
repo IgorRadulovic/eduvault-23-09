@@ -21,7 +21,7 @@ export default function CookieBanner() {
         <p style={{ fontSize:14, fontWeight:600, marginBottom:6 }}>🍪 We use cookies</p>
         <p style={{ fontSize:13, color:'var(--text2)', lineHeight:1.6 }}>
           We use essential cookies to make our site work, and optional analytics cookies to improve your experience.{' '}
-          <a href="#" style={{ color:'var(--accent)' }}>Privacy Policy</a>
+          <a href="#" style={{ color:'var(--accent-text)' }}>Privacy Policy</a>
         </p>
       </div>
       <div style={{ display:'flex', gap:8, alignSelf:'center', flexShrink:0 }}>

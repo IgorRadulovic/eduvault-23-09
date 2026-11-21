@@ -43,7 +43,7 @@ export default function ProductCard({ product }) {
 
         <div style={{ padding:'16px 18px 18px', display:'flex', flexDirection:'column', gap:4, flex:1 }}>
           {product.category && (
-            <p style={{ fontSize:12, fontWeight:700, letterSpacing:'.6px', textTransform:'uppercase', color:'var(--accent)' }}>{product.category}</p>
+            <p style={{ fontSize:12, fontWeight:700, letterSpacing:'.6px', textTransform:'uppercase', color:'var(--accent-text)' }}>{product.category}</p>
           )}
           <h3 style={{ fontSize:16, fontWeight:700, lineHeight:1.35, color:'var(--text)', fontFamily:'inherit' }}>{product.title}</h3>
           <p style={{ fontSize:13, color:'var(--text2)' }}>

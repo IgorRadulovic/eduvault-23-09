@@ -12,6 +12,7 @@ import CartPage         from './pages/CartPage';
 import CheckoutPage     from './pages/CheckoutPage';
 import MyCourses        from './pages/MyCourses';
 import CreateCoursePage from './pages/CreateCoursePage';
+import LearnPage        from './pages/LearnPage';
 import NotFound         from './pages/NotFound';
 import AdminDashboard   from './pages/admin/AdminDashboard';
 import { LoginPage, SignupPage, ForgotPasswordPage } from './pages/auth/AuthPages';
@@ -56,6 +57,7 @@ export default function App() {
           <Route path="/signup"          element={<RequireGuest><SignupPage /></RequireGuest>} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/my-courses" element={<RequireAuth><MyCourses /></RequireAuth>} />
+          <Route path="/learn/:slug" element={<RequireAuth><LearnPage /></RequireAuth>} />
           <Route path="/checkout"   element={<RequireAuth><CheckoutPage /></RequireAuth>} />
           <Route path="/create"     element={<RequireAuth><CreateCoursePage /></RequireAuth>} />
           <Route path="/admin/*"    element={<RequireAdmin><AdminDashboard /></RequireAdmin>} />

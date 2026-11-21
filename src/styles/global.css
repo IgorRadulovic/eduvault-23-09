@@ -9,11 +9,12 @@
 
   --text:           #0D1B2A;
   --text2:          #374B63;
-  --text3:          #7A90A8;
+  --text3:          #5A6F86;   /* ≥4.4:1 on all light surfaces */
 
   --accent:         #1565C0;
   --accent-h:       #0D47A1;
   --accent2:        #1976D2;
+  --accent-text:    #1565C0;   /* accent used as text: ≥4.5:1 on every surface */
   --accent-bg:      #E3EDF9;
   --accent-border:  #90B8E8;
 
@@ -35,6 +36,12 @@
 
   --navy:           #0D1B2A;
   --navy-mid:       #1A3550;
+  /* Dark brand areas (homepage hero, creator banner) — stay dark in both themes */
+  --hero-bg:        #0D1B2A;
+  --hero-card:      #FFFFFF;
+  --on-white:       #0D1B2A;   /* text on always-white buttons */
+  --cta-bg:         #1565C0;
+  --cta-text:       #DCE8F7;
   --footer-bg:      #0D1B2A;
   --footer-bg2:     #10243A;
   --footer-text:    rgba(255,255,255,.78);
@@ -74,11 +81,12 @@
 
   --text:           #E8F0F9;
   --text2:          #8BAAC8;
-  --text3:          #4A6880;
+  --text3:          #7391AE;   /* ≥4.5:1 on --bg2 */
 
   --accent:         #2979FF;
   --accent-h:       #448AFF;
   --accent2:        #1E88E5;
+  --accent-text:    #5B9BFF;   /* #2979FF is too dim as text on dark surfaces */
   --accent-bg:      #0D1E38;
   --accent-border:  #1A4080;
 
@@ -100,6 +108,11 @@
 
   --navy:           #E8F0F9;
   --navy-mid:       #8BAAC8;
+  --hero-bg:        #0E2036;   /* a step lighter than --bg so the hero still reads as a band */
+  --hero-card:      #192E44;
+  --on-white:       #0D1B2A;
+  --cta-bg:         #1A4A8C;   /* the dark-theme accent is too light for pale text */
+  --cta-text:       #DCE8F7;
   --footer-bg:      #050B13;
   --footer-bg2:     #0A1624;
   --footer-text:    rgba(232,240,249,.84);

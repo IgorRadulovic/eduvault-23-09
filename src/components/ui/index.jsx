@@ -15,10 +15,10 @@ export function Button({ children, variant='primary', size='md', onClick, disabl
     secondary: { background:'var(--bg3)',          color:'var(--text)',       border:'1px solid var(--border)' },
     ghost:     { background:'transparent',         color:'var(--text2)',      border:'none' },
     danger:    { background:'var(--danger-bg)',    color:'var(--danger)',     border:'1px solid var(--danger-border)' },
-    outline:   { background:'transparent',         color:'var(--accent)',     border:'1px solid var(--accent)' },
+    outline:   { background:'transparent',         color:'var(--accent-text)',     border:'1px solid var(--accent)' },
     gold:      { background:'var(--gold)',          color:'#fff',             border:'none' },
     success:   { background:'var(--success-bg)',   color:'var(--success)',    border:'1px solid var(--success-border)' },
-    navy:      { background:'var(--navy)',          color:'#fff',             border:'none' },
+    navy:      { background:'var(--hero-bg)',          color:'#fff',             border:'none' },
   };
   const hoverMap = {
     primary:   { background:'var(--accent-h)' },
@@ -65,7 +65,7 @@ export function Badge({ children, variant='default', size='sm', dot, style={} })
     danger:  { bg:'var(--danger-bg)',  color:'var(--danger)' },
     info:    { bg:'var(--info-bg)',    color:'var(--info)' },
     gold:    { bg:'var(--gold-bg)',    color:'var(--gold)' },
-    accent:  { bg:'var(--accent-bg)', color:'var(--accent)' },
+    accent:  { bg:'var(--accent-bg)', color:'var(--accent-text)' },
   };
   const s = {
     xs: { padding:'2px 8px',   fontSize:10 },
@@ -90,7 +90,7 @@ export function Input({ label, type='text', value, onChange, placeholder, icon, 
     <div style={{ marginBottom:18, ...style }}>
       {label && <label style={{ display:'block', fontSize:13, fontWeight:500, color:'var(--text2)', marginBottom:6 }}>{label}{req && <span style={{ color:'var(--danger)', marginLeft:3 }}>*</span>}</label>}
       <div style={{ position:'relative' }}>
-        {icon && <span style={{ position:'absolute', left:13, top:'50%', transform:'translateY(-50%)', fontSize:15, color: focus ? 'var(--accent)' : 'var(--text3)', pointerEvents:'none', transition:'color .2s' }}>{icon}</span>}
+        {icon && <span style={{ position:'absolute', left:13, top:'50%', transform:'translateY(-50%)', fontSize:15, color: focus ? 'var(--accent-text)' : 'var(--text3)', pointerEvents:'none', transition:'color .2s' }}>{icon}</span>}
         <input type={t} value={value} name={name} autoComplete={autoComplete} readOnly={readOnly} placeholder={placeholder}
           onChange={e => onChange?.(e.target.value)}
           onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}

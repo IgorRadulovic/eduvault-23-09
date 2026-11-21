@@ -126,6 +126,13 @@ export async function getProducts({ type, category, search, page=1, limit=12, in
     }, { products:[], total:0, page, totalPages:0 });
   }
 }
+// For the lesson player: no is_published filter, so creators and admins can preview drafts (RLS still applies).
+export async function getProductForLearning(slug) {
+  const { data, error }=await supabase.from('products_with_category').select('*').eq('slug',slug).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error('Course not found.');
+  return normalizeProduct(data);
+}
 export async function getProductBySlug(slug) {
   try { const { data, error }=await supabase.from('products_with_category').select('*').eq('slug',slug).eq('is_published',true).maybeSingle(); if (error) throw error; if (!data) throw new Error('Product not found.'); return normalizeProduct(data); }
   catch (err) {
@@ -219,9 +226,17 @@ export async function getUserEnrollments(userId) {
 export async function getMyEnrollment(productId) {
   const uid=auth?.currentUser?.uid;
   if (!uid||!SUPABASE_CONFIGURED) return null;
-  const { data, error }=await supabase.from('enrollments').select('id,enrolled_at,order_id').eq('user_id',uid).eq('product_id',productId).maybeSingle();
+  const { data, error }=await supabase.from('enrollments').select('id,enrolled_at,order_id,progress,completed_lectures').eq('user_id',uid).eq('product_id',productId).maybeSingle();
   if (error) { console.error('[Supabase]', error.message); return null; }
   return data??null;
+}
+// Saves which lectures are done; progress % is derived from it.
+export async function saveCourseProgress(productId, completedLectures, totalLectures) {
+  const uid=auth?.currentUser?.uid; if (!uid) return;
+  const progress=totalLectures?Math.round((completedLectures.length/totalLectures)*100):0;
+  const { error }=await supabase.from('enrollments').update({ completed_lectures:completedLectures, progress, completed_at:progress===100?new Date().toISOString():null }).eq('user_id',uid).eq('product_id',productId);
+  if (error) throw new Error(error.message);
+  return progress;
 }
 export async function enrollUser(userId, productId, orderId) {
   const { error }=await supabase.from('enrollments').upsert({ user_id:userId, product_id:productId, order_id:orderId, progress:0 },{ onConflict:'user_id,product_id' });
@@ -271,6 +286,11 @@ export async function uploadEbookFile(file, onProgress) {
 export async function getSignedUrl(bucket, path, expiresIn=3600, options) {
   const { data, error }=await supabase.storage.from(bucket).createSignedUrl(path,expiresIn,options);
   if (error) throw new Error('Could not generate download link: '+error.message); return data.signedUrl;
+}
+// Lecture videos: storage RLS only signs them for buyers, the uploader and admins.
+export async function getLectureVideoUrl(path) {
+  try { return await getSignedUrl('course-videos',path,3*3600); }
+  catch { throw new Error('This video is not available to your account.'); }
 }
 // Short-lived link; storage RLS only signs it for buyers, the uploader and admins.
 export async function getEbookDownloadUrl(path, title='ebook') {

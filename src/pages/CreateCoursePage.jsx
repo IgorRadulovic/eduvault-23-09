@@ -2,8 +2,9 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, toast } from '../context';
-import { createProduct, uploadProductImage, uploadEbookFile } from '../api/services';
+import { createProduct, uploadProductImage, uploadEbookFile, uploadLectureVideo } from '../api/services';
 import EbookFileInput from '../components/courses/EbookFileInput';
+import Icon from '../components/ui/Icon';
 import { Button, Input, Select, Textarea } from '../components/ui';
 import SEO from '../components/layout/SEO';
 
@@ -13,19 +14,20 @@ const STEPS = [
   { id:'curriculum',  icon:'📋', label:'Curriculum'     },
   { id:'landing',     icon:'🖼️',  label:'Landing Page'  },
   { id:'pricing',     icon:'💰', label:'Pricing'        },
-  { id:'promotions',  icon:'🎫', label:'Promotions'     },
   { id:'messages',    icon:'💬', label:'Messages'       },
 ];
 
 const CATEGORIES = ['Development','Design','Business','Data Science','Marketing','Productivity'];
 const LEVELS     = ['Beginner','Intermediate','Advanced','All Levels'];
 const LANGUAGES  = ['English','Spanish','French','German','Portuguese','Italian','Arabic','Chinese','Japanese','Hindi','Other'];
-const CURRENCIES = [
-  { code:'USD', symbol:'$', label:'USD — US Dollar' },
-  { code:'EUR', symbol:'€', label:'EUR — Euro' },
-  { code:'GBP', symbol:'£', label:'GBP — British Pound' },
-  { code:'BAM', symbol:'KM', label:'BAM — Bosnia & Herzegovina' },
-];
+// All prices on the site are in US dollars
+const CURRENCIES = [{ code:'USD', symbol:'$', label:'USD — US Dollar' }];
+
+// Supabase free plan: 50 MB per file. On the Pro plan, raise the project's
+// upload limit (Storage → Settings) and this value together.
+const VIDEO_MAX_MB  = 50;
+const VIDEO_ACCEPT  = '.mp4,.webm,.mov';
+const fmtMB = b => `${(b/1024/1024).toFixed(1)} MB`;
 
 // ─── tiny sub-components ──────────────────────
 function SectionTitle({ children, sub }) {
@@ -54,115 +56,109 @@ function InfoBox({ icon='💡', color='var(--info)', bg='var(--info-bg)', border
 }
 
 // ─── Curriculum builder ───────────────────────
-function CurriculumBuilder({ value, onChange }) {
-  function addSection() {
-    onChange([...value, { id:Date.now(), title:'', lectures:[] }]);
+// onChange receives an updater function, so a video that finishes uploading
+// doesn't overwrite edits made while it was uploading.
+function CurriculumBuilder({ value, onChange, withVideos, errors=[] }) {
+  const mapSection = (sid, fn) => onChange(cur => cur.map(s => s.id===sid ? fn(s) : s));
+  const mapLecture = (sid, lid, fn) => mapSection(sid, s => ({ ...s, lectures:s.lectures.map(l => l.id===lid ? fn(l) : l) }));
+
+  const addSection    = ()        => onChange(cur => [...cur, { id:Date.now(), title:'', lectures:[] }]);
+  const removeSection = sid       => onChange(cur => cur.filter(s => s.id!==sid));
+  const addLecture    = sid       => mapSection(sid, s => ({ ...s, lectures:[...s.lectures, { id:Date.now(), title:'', caption:'' }] }));
+  const removeLecture = (sid,lid) => mapSection(sid, s => ({ ...s, lectures:s.lectures.filter(l => l.id!==lid) }));
+
+  async function pickVideo(sid, lid, e) {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!VIDEO_ACCEPT.split(',').includes(`.${ext}`)) { toast.error('Upload an MP4, WebM or MOV video.'); return; }
+    if (file.size > VIDEO_MAX_MB*1024*1024) { toast.error(`Videos must be under ${VIDEO_MAX_MB} MB (this one is ${fmtMB(file.size)}).`); return; }
+    mapLecture(sid, lid, l => ({ ...l, uploading:0 }));
+    try {
+      const path = await uploadLectureVideo(file, pct => mapLecture(sid, lid, l => ({ ...l, uploading:pct })));
+      mapLecture(sid, lid, l => ({ ...l, uploading:undefined, videoPath:path, videoName:file.name, videoSize:file.size }));
+    } catch (err) {
+      mapLecture(sid, lid, l => ({ ...l, uploading:undefined }));
+      toast.error(`${file.name}: ${err.message}`);
+    }
   }
-  function removeSection(sid) {
-    onChange(value.filter(s=>s.id!==sid));
-  }
-  function updateSection(sid, title) {
-    onChange(value.map(s=>s.id===sid?{...s,title}:s));
-  }
-  function addLecture(sid) {
-    onChange(value.map(s=>s.id===sid?{...s,lectures:[...s.lectures,{id:Date.now(),title:'',caption:''}]}:s));
-  }
-  function removeLecture(sid,lid) {
-    onChange(value.map(s=>s.id===sid?{...s,lectures:s.lectures.filter(l=>l.id!==lid)}:s));
-  }
-  function updateLecture(sid,lid,field,val) {
-    onChange(value.map(s=>s.id===sid?{...s,lectures:s.lectures.map(l=>l.id===lid?{...l,[field]:val}:l)}:s));
-  }
+
+  const inputStyle = { width:'100%', background:'var(--bg)', border:'1.5px solid var(--border2)', borderRadius:8, padding:'8px 12px', fontSize:14, color:'var(--text)', outline:'none' };
 
   return (
     <div>
+      {errors.length>0 && (
+        <div role="alert" style={{ background:'var(--danger-bg)', border:'1px solid var(--danger-border)', borderRadius:12, padding:'12px 16px', marginBottom:16 }}>
+          <p style={{ fontSize:14, fontWeight:600, color:'var(--danger)', marginBottom:4 }}>Please fix the following:</p>
+          <ul style={{ margin:0, paddingLeft:18, fontSize:13, color:'var(--danger)', lineHeight:1.7 }}>
+            {errors.map(e => <li key={e}>{e}</li>)}
+          </ul>
+        </div>
+      )}
+
       {value.map((section,si) => (
         <div key={section.id} style={{ border:'1px solid var(--border)', borderRadius:12, marginBottom:14, overflow:'hidden' }}>
-          {/* Section header */}
           <div style={{ background:'var(--bg3)', padding:'14px 18px', display:'flex', gap:12, alignItems:'center' }}>
-            <span style={{ fontSize:12, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.7px', flexShrink:0 }}>Section {si+1}</span>
-            <input value={section.title} onChange={e=>updateSection(section.id,e.target.value)}
-              placeholder="Section title (e.g. Introduction, Getting Started…)"
-              style={{ flex:1, background:'var(--bg2)', border:'1.5px solid var(--border2)', borderRadius:8, padding:'8px 12px', fontSize:14, color:'var(--text)', outline:'none' }}
-              onFocus={e=>e.target.style.borderColor='var(--accent)'}
-              onBlur={e=>e.target.style.borderColor='var(--border2)'}
-            />
-            <button onClick={()=>removeSection(section.id)}
+            <span style={{ fontSize:12, fontWeight:700, color:'var(--text2)', textTransform:'uppercase', letterSpacing:'.7px', flexShrink:0 }}>{withVideos?'Section':'Chapter'} {si+1}</span>
+            <input value={section.title} onChange={e=>{ const v=e.target.value; mapSection(section.id, s=>({ ...s, title:v })); }}
+              placeholder={withVideos?'Section title (e.g. Introduction, Getting Started…)':'Chapter title'} aria-label={`Section ${si+1} title`}
+              style={{ ...inputStyle, flex:1, background:'var(--bg2)', borderColor:section.title.trim()?'var(--border2)':'var(--border2)' }} />
+            <button type="button" onClick={()=>removeSection(section.id)}
               style={{ background:'var(--danger-bg)', border:'none', borderRadius:7, padding:'6px 10px', cursor:'pointer', color:'var(--danger)', fontSize:13, flexShrink:0 }}>
               Remove
             </button>
           </div>
 
-          {/* Lectures */}
           <div style={{ padding:'12px 18px 14px' }}>
-            {section.lectures.map((lec,li) => (
-              <div key={lec.id} style={{ display:'flex', gap:10, alignItems:'flex-start', marginBottom:10, paddingLeft:12, borderLeft:'2px solid var(--accent-border)' }}>
-                <div style={{ flex:1 }}>
-                  <input value={lec.title} onChange={e=>updateLecture(section.id,lec.id,'title',e.target.value)}
-                    placeholder={`Lecture ${li+1} title`}
-                    style={{ width:'100%', background:'var(--bg)', border:'1.5px solid var(--border2)', borderRadius:8, padding:'8px 12px', fontSize:14, color:'var(--text)', outline:'none', marginBottom:6 }}
-                    onFocus={e=>e.target.style.borderColor='var(--accent)'}
-                    onBlur={e=>e.target.style.borderColor='var(--border2)'}
-                  />
-                  <input value={lec.caption} onChange={e=>updateLecture(section.id,lec.id,'caption',e.target.value)}
-                    placeholder="Caption / subtitle (optional)"
-                    style={{ width:'100%', background:'var(--bg)', border:'1.5px solid var(--border2)', borderRadius:8, padding:'7px 12px', fontSize:13, color:'var(--text2)', outline:'none' }}
-                    onFocus={e=>e.target.style.borderColor='var(--accent)'}
-                    onBlur={e=>e.target.style.borderColor='var(--border2)'}
-                  />
+            {section.lectures.map((lec,li) => {
+              const uploading = lec.uploading !== undefined;
+              return (
+                <div key={lec.id} style={{ display:'flex', gap:10, alignItems:'flex-start', marginBottom:12, paddingLeft:12, borderLeft:'2px solid var(--accent-border)' }}>
+                  <div style={{ flex:1, display:'flex', flexDirection:'column', gap:6, minWidth:0 }}>
+                    <input value={lec.title} onChange={e=>{ const v=e.target.value; mapLecture(section.id, lec.id, l=>({ ...l, title:v })); }}
+                      placeholder={withVideos?`Lecture ${li+1} title`:`Part ${li+1} title`} aria-label={`Lecture ${li+1} title`} style={inputStyle} />
+                    <input value={lec.caption} onChange={e=>{ const v=e.target.value; mapLecture(section.id, lec.id, l=>({ ...l, caption:v })); }}
+                      placeholder="Short description (optional)" aria-label={`Lecture ${li+1} description`} style={{ ...inputStyle, fontSize:13, color:'var(--text2)' }} />
+                    {withVideos && (
+                      uploading ? (
+                        <div>
+                          <p style={{ fontSize:13, color:'var(--text2)', marginBottom:4 }}>Uploading video… {lec.uploading}%</p>
+                          <div style={{ background:'var(--bg3)', borderRadius:99, height:6, overflow:'hidden' }}>
+                            <div style={{ width:`${lec.uploading}%`, height:6, background:'var(--accent)', transition:'width .2s' }} />
+                          </div>
+                        </div>
+                      ) : (
+                        <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, cursor:'pointer', padding:'8px 12px', borderRadius:8,
+                          border:`1.5px dashed ${lec.videoPath?'var(--success-border)':'var(--border2)'}`, background:lec.videoPath?'var(--success-bg)':'transparent', color:lec.videoPath?'var(--success)':'var(--text2)' }}>
+                          <Icon name={lec.videoPath?'check':'play'} size={15} />
+                          <span style={{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                            {lec.videoPath ? `${lec.videoName ?? 'Video uploaded'}${lec.videoSize?` · ${fmtMB(lec.videoSize)}`:''} — click to replace` : `Upload lecture video * (MP4, WebM or MOV · max ${VIDEO_MAX_MB} MB)`}
+                          </span>
+                          <input type="file" accept={VIDEO_ACCEPT} onChange={e=>pickVideo(section.id, lec.id, e)} style={{ display:'none' }} />
+                        </label>
+                      )
+                    )}
+                  </div>
+                  <button type="button" onClick={()=>removeLecture(section.id,lec.id)} aria-label="Remove lecture" disabled={uploading}
+                    style={{ background:'none', border:'none', color:'var(--text3)', cursor:'pointer', padding:4, marginTop:4 }}>
+                    <Icon name="close" size={18} />
+                  </button>
                 </div>
-                <button onClick={()=>removeLecture(section.id,lec.id)}
-                  style={{ background:'none', border:'none', color:'var(--text3)', cursor:'pointer', fontSize:18, padding:'4px', marginTop:4 }}>✕</button>
-              </div>
-            ))}
-            <button onClick={()=>addLecture(section.id)}
-              style={{ display:'flex', alignItems:'center', gap:7, padding:'8px 14px', background:'transparent', border:'1.5px dashed var(--border2)', borderRadius:8, cursor:'pointer', fontSize:13, color:'var(--text2)', transition:'all .18s', marginTop:section.lectures.length?6:0 }}
-              onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--accent)';e.currentTarget.style.color='var(--accent)';}}
-              onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--border2)';e.currentTarget.style.color='var(--text2)';}}>
-              + Add Lecture
+              );
+            })}
+            <button type="button" onClick={()=>addLecture(section.id)}
+              style={{ display:'flex', alignItems:'center', gap:7, padding:'8px 14px', background:'transparent', border:'1.5px dashed var(--border2)', borderRadius:8, cursor:'pointer', fontSize:13, color:'var(--text2)', marginTop:section.lectures.length?6:0 }}>
+              <Icon name="plus" size={15} /> {withVideos?'Add lecture':'Add part'}
             </button>
           </div>
         </div>
       ))}
 
-      <button onClick={addSection}
-        style={{ display:'flex', alignItems:'center', gap:8, padding:'12px 20px', background:'var(--accent-bg)', border:'1.5px dashed var(--accent-border)', borderRadius:10, cursor:'pointer', fontSize:14, fontWeight:600, color:'var(--accent)', width:'100%', justifyContent:'center', transition:'all .18s' }}
-        onMouseEnter={e=>{e.currentTarget.style.background='var(--accent)';e.currentTarget.style.color='#fff';e.currentTarget.style.borderStyle='solid';}}
-        onMouseLeave={e=>{e.currentTarget.style.background='var(--accent-bg)';e.currentTarget.style.color='var(--accent)';e.currentTarget.style.borderStyle='dashed';}}>
-        + Add Section
+      <button type="button" onClick={addSection}
+        style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'12px 20px', background:'var(--accent-bg)', border:'1.5px dashed var(--accent-border)', borderRadius:10, cursor:'pointer', fontSize:14, fontWeight:600, color:'var(--accent-text)', width:'100%' }}>
+        <Icon name="plus" size={16} /> {withVideos?'Add section':'Add chapter'}
       </button>
-    </div>
-  );
-}
-
-// ─── Coupon picker ────────────────────────────
-function CouponPicker({ value, onChange }) {
-  const [code,setCode]=useState('');
-  const add=()=>{
-    const c=code.toUpperCase().trim();
-    if(c&&!value.includes(c)){onChange([...value,c]);setCode('');}
-  };
-  return (
-    <div>
-      <div style={{ display:'flex', gap:10, marginBottom:14 }}>
-        <input value={code} onChange={e=>setCode(e.target.value.toUpperCase())} onKeyDown={e=>e.key==='Enter'&&add()}
-          placeholder="Enter coupon code (e.g. LAUNCH50)"
-          style={{ flex:1, background:'var(--bg)', border:'1.5px solid var(--border2)', borderRadius:9, padding:'10px 14px', fontSize:14, color:'var(--text)', outline:'none', letterSpacing:'.5px' }}
-          onFocus={e=>e.target.style.borderColor='var(--accent)'}
-          onBlur={e=>e.target.style.borderColor='var(--border2)'}
-        />
-        <Button variant="outline" size="md" onClick={add}>Add</Button>
-      </div>
-      {value.length>0&&(
-        <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-          {value.map(c=>(
-            <div key={c} style={{ display:'flex', alignItems:'center', gap:6, background:'var(--accent-bg)', border:'1px solid var(--accent-border)', borderRadius:99, padding:'4px 12px 4px 14px', fontSize:13, color:'var(--accent)', fontWeight:600 }}>
-              {c}
-              <button onClick={()=>onChange(value.filter(x=>x!==c))} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--accent)', fontSize:14, lineHeight:1, padding:0 }}>✕</button>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -181,6 +177,7 @@ export default function CreateCoursePage() {
   const [ebookFile, setEbookFile] = useState(null);
   const [uploadPct, setUploadPct] = useState(null);
   const [errors, setErrors]     = useState({});
+  const [badSteps, setBadSteps] = useState([]);   // steps with missing fields after a submit attempt
 
   const [form, setForm] = useState({
     type:            'course',
@@ -194,6 +191,7 @@ export default function CreateCoursePage() {
     author:          user?.name??'',
     language:        'English',
     level:           'All Levels',
+    duration:        '',
     category:        'Development',
     promoVideoUrl:   '',
     emoji:           '',
@@ -202,8 +200,6 @@ export default function CreateCoursePage() {
     currency:        'USD',
     price:           '',
     originalPrice:   '',
-    // Promotions
-    coupons:         [],
     // Messages
     welcomeMessage:  '',
     congratsMessage: '',
@@ -224,40 +220,85 @@ export default function CreateCoursePage() {
 
   const F = (k) => ({ value:form[k], onChange:(v)=>sf(k,v) });
 
-  function validate(s) {
+  // Required everywhere: everything a buyer sees. Optional: compare-at price,
+  // promo video URL and lecture descriptions.
+  function checkStep(s) {
     const e={};
-    if (s===1&&form.type==='ebook'&&!ebookFile) e.ebookFile = 'Upload the ebook file buyers will download.';
+    const isCourse = form.type==='course';
+    const blank = v => !String(v ?? '').trim();
+    if (s===1) {
+      const list=[];
+      if (form.type==='ebook'&&!ebookFile) e.ebookFile = 'Upload the eBook file buyers will download.';
+      if (form.curriculum.length===0) list.push(isCourse?'Add at least one section.':'Add at least one chapter.');
+      form.curriculum.forEach((sec,si) => {
+        const name = sec.title.trim() ? `"${sec.title.trim()}"` : `${isCourse?'Section':'Chapter'} ${si+1}`;
+        if (!sec.title.trim()) list.push(`${name} needs a title.`);
+        if (isCourse&&sec.lectures.length===0) list.push(`${name} needs at least one lecture.`);
+        sec.lectures.forEach((l,li) => {
+          if (!l.title.trim()) list.push(`${name}: lecture ${li+1} needs a title.`);
+          if (isCourse&&l.uploading!==undefined) list.push(`${name}: wait for "${l.title||`lecture ${li+1}`}" to finish uploading.`);
+          else if (isCourse&&!l.videoPath) list.push(`${name}: upload a video for "${l.title||`lecture ${li+1}`}".`);
+        });
+      });
+      if (list.length) e.curriculum = list;
+    }
     if (s===2) {
-      if (!form.title.trim())       e.title       = 'Course title is required.';
-      if (!form.description.trim()) e.description = 'Short description is required.';
-      if (!form.author.trim())      e.author      = 'Author / instructor name is required.';
+      if (blank(form.title))           e.title           = 'Title is required.';
+      if (blank(form.slug))            e.slug            = 'URL slug is required.';
+      if (blank(form.description))     e.description     = 'Short description is required.';
+      if (blank(form.longDescription)) e.longDescription = 'Full description is required.';
+      if (blank(form.author))          e.author          = 'Author / instructor name is required.';
+      if (blank(form.tags))            e.tags            = 'Add at least one tag.';
+      if (!imgFile)                    e.image           = 'Upload a cover image.';
+      if (isCourse&&blank(form.duration)) e.duration     = 'Total duration is required.';
+      if (!isCourse&&(!form.pages||isNaN(form.pages)||Number(form.pages)<1)) e.pages = 'Enter the number of pages.';
+      if (form.promoVideoUrl.trim()&&!/^https?:\/\/\S+$/i.test(form.promoVideoUrl.trim())) e.promoVideoUrl = 'Enter a full link starting with https://';
     }
     if (s===3) {
-      if (!form.price||isNaN(form.price)||Number(form.price)<0) e.price = 'Enter a valid price.';
+      if (blank(form.price)||isNaN(form.price)||Number(form.price)<0) e.price = 'Enter a valid price (0 for free).';
+      if (form.originalPrice&&(isNaN(form.originalPrice)||Number(form.originalPrice)<=Number(form.price))) e.originalPrice = 'Must be higher than the price, or leave it blank.';
     }
+    if (s===4) {
+      if (blank(form.welcomeMessage))  e.welcomeMessage  = 'Write a welcome message.';
+      if (blank(form.congratsMessage)) e.congratsMessage = 'Write a congratulations message.';
+    }
+    return e;
+  }
+
+  function validate(s) {
+    const e = checkStep(s);
     setErrors(e);
+    setBadSteps(b => Object.keys(e).length ? [...new Set([...b, s])] : b.filter(x => x!==s));
     return Object.keys(e).length===0;
   }
 
+  // Every step must pass before submitting; jump to the first incomplete one.
+  function validateAll() {
+    const bad = [1,2,3,4].filter(s => Object.keys(checkStep(s)).length);
+    setBadSteps(bad);
+    if (!bad.length) return true;
+    setStep(bad[0]);
+    setErrors(checkStep(bad[0]));
+    toast.error('Some required fields are missing — they are highlighted.');
+    return false;
+  }
+
   function next()  { if (validate(step)) setStep(s=>Math.min(s+1, STEPS.length-1)); }
+  function goTo(i) { setStep(i); setErrors(badSteps.includes(i) ? checkStep(i) : {}); }
   function prev()  { setStep(s=>Math.max(s-1,0)); }
 
   function handleImg(e) {
     const f=e.target.files[0]; if(!f) return;
     if(f.size>5*1024*1024){toast.error('Image must be under 5MB.');return;}
-    setImgFile(f); setImgPrev(URL.createObjectURL(f));
+    setImgFile(f); setImgPrev(URL.createObjectURL(f)); setErrors(er=>({...er,image:''}));
   }
 
   async function handleSubmit() {
-    if (!validate(step)) return;
-    if (form.type==='ebook'&&!ebookFile) { setStep(1); validate(1); return; }
+    if (!validateAll()) return;
     setSaving(true);
     try {
-      let imageUrl = '';
-      if (imgFile) {
-        try { imageUrl = await uploadProductImage(imgFile); }
-        catch (err) { toast.warning('Image upload failed — submitting without image.'); }
-      }
+      // The cover image is required, so a failed upload stops the submit
+      const imageUrl = await uploadProductImage(imgFile);
 
       // Unlike the image, the ebook file is essential — stop if it fails
       let ebookFileUrl = null;
@@ -278,11 +319,14 @@ export default function CreateCoursePage() {
         category:        form.category,
         language:        form.language,
         level:           form.type==='course' ? form.level : undefined,
+        duration:        form.type==='course' ? form.duration.trim() : undefined,
+        lessons:         form.type==='course' ? form.curriculum.reduce((n,s)=>n+s.lectures.length,0) : undefined,
         image:           imageUrl,
         color:           form.color,
         emoji:           form.emoji||(form.type==='ebook'?'📖':'💻'),
         tags:            form.tags.split(',').map(t=>t.trim()).filter(Boolean),
-        curriculum:      form.curriculum,
+        // Drop transient upload state before saving
+        curriculum:      form.curriculum.map(s=>({ ...s, title:s.title.trim(), lectures:s.lectures.map(({ uploading, ...l })=>({ ...l, title:l.title.trim(), caption:(l.caption??'').trim() })) })),
         promoVideoUrl:   form.promoVideoUrl.trim(),
         welcomeMessage:  form.welcomeMessage.trim(),
         congratsMessage: form.congratsMessage.trim(),
@@ -339,16 +383,16 @@ export default function CreateCoursePage() {
               const done = i < step;
               const active = i === step;
               return (
-                <button key={s.id} onClick={()=>setStep(i)}
+                <button key={s.id} onClick={()=>goTo(i)}
                   style={{ width:'100%', display:'flex', alignItems:'center', gap:12, padding:'14px 18px', border:'none', borderBottom:'1px solid var(--border)', background: active?'var(--accent-bg)':'transparent', cursor:'pointer', textAlign:'left', transition:'background .15s' }}
                   onMouseEnter={e=>{if(!active)e.currentTarget.style.background='var(--bg3)';}}
                   onMouseLeave={e=>{if(!active)e.currentTarget.style.background='transparent';}}>
                   <div style={{ width:28, height:28, borderRadius:'50%', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, transition:'all .25s', background:done?'var(--success)':active?'var(--accent)':'var(--bg3)', color:done||active?'#fff':'var(--text3)' }}>
-                    {done?'✓':i+1}
+                    {badSteps.includes(i)?'!':done?'✓':i+1}
                   </div>
                   <div>
-                    <p style={{ fontSize:13, fontWeight:active?600:400, color:active?'var(--accent)':done?'var(--text)':'var(--text3)' }}>{s.label}</p>
-                    <p style={{ fontSize:11, color:'var(--text3)' }}>{s.icon}</p>
+                    <p style={{ fontSize:13, fontWeight:active?600:400, color:active?'var(--accent-text)':done?'var(--text)':'var(--text3)' }}>{s.label}</p>
+                    {badSteps.includes(i)&&<p style={{ fontSize:11, color:'var(--danger)', fontWeight:600 }}>Missing fields</p>}
                   </div>
                 </button>
               );
@@ -363,7 +407,7 @@ export default function CreateCoursePage() {
                 {imgPrev ? <img src={imgPrev} style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : (form.emoji||'📚')}
               </div>
               <p style={{ fontSize:13, fontWeight:600, lineHeight:1.4, marginBottom:4 }}>{form.title}</p>
-              {form.price&&<p style={{ fontSize:15, fontWeight:700, color:'var(--accent)' }}>${form.price}</p>}
+              {form.price&&<p style={{ fontSize:15, fontWeight:700, color:'var(--accent-text)' }}>${form.price}</p>}
             </div>
           )}
         </aside>
@@ -387,9 +431,9 @@ export default function CreateCoursePage() {
                       onMouseLeave={e=>{if(form.type!==opt.value){e.currentTarget.style.borderColor='var(--border)';}}}
                     >
                       <div style={{ fontSize:36, marginBottom:12 }}>{opt.icon}</div>
-                      <p style={{ fontSize:16, fontWeight:700, color:form.type===opt.value?'var(--accent)':'var(--text)', marginBottom:8 }}>{opt.label}</p>
+                      <p style={{ fontSize:16, fontWeight:700, color:form.type===opt.value?'var(--accent-text)':'var(--text)', marginBottom:8 }}>{opt.label}</p>
                       <p style={{ fontSize:13, color:'var(--text3)', lineHeight:1.6 }}>{opt.desc}</p>
-                      {form.type===opt.value&&<div style={{ marginTop:12, fontSize:12, color:'var(--accent)', fontWeight:600 }}>✓ Selected</div>}
+                      {form.type===opt.value&&<div style={{ marginTop:12, fontSize:12, color:'var(--accent-text)', fontWeight:600 }}>✓ Selected</div>}
                     </button>
                   ))}
                 </div>
@@ -406,9 +450,12 @@ export default function CreateCoursePage() {
                   <EbookFileInput file={ebookFile} error={errors.ebookFile} progress={uploadPct}
                     onChange={f=>{ setEbookFile(f); setErrors(e=>({...e,ebookFile:''})); }} />
                 )}
-                <CurriculumBuilder value={form.curriculum} onChange={v=>sf('curriculum',v)} />
+                <CurriculumBuilder value={form.curriculum} withVideos={form.type==='course'} errors={errors.curriculum}
+                  onChange={upd=>setForm(f=>({ ...f, curriculum:typeof upd==='function'?upd(f.curriculum):upd }))} />
                 {form.curriculum.length===0&&(
-                  <InfoBox>Start by adding a section (e.g. "Introduction"), then add lectures inside it. You can always edit this later.</InfoBox>
+                  <InfoBox>{form.type==='course'
+                    ? 'Add a section (e.g. "Introduction"), then lectures inside it. Every lecture needs a title and a video.'
+                    : 'Add the chapters of your eBook. Buyers see this list on the product page.'}</InfoBox>
                 )}
               </Card>
             )}
@@ -423,13 +470,14 @@ export default function CreateCoursePage() {
                   <div style={{ marginBottom:18 }}>
                     <label style={{ display:'block', fontSize:13, fontWeight:500, color:'var(--text2)', marginBottom:6 }}>URL Slug</label>
                     <div style={{ display:'flex', alignItems:'center', background:'var(--bg)', border:'1.5px solid var(--border2)', borderRadius:9, overflow:'hidden' }}>
-                      <span style={{ padding:'11px 12px', fontSize:12, color:'var(--text3)', background:'var(--bg3)', borderRight:'1px solid var(--border2)', whiteSpace:'nowrap' }}>eduvault.com/product/</span>
+                      <span style={{ padding:'11px 12px', fontSize:12, color:'var(--text3)', background:'var(--bg3)', borderRight:'1px solid var(--border2)', whiteSpace:'nowrap' }}>{window.location.host}/product/</span>
                       <input value={form.slug} onChange={e=>sf('slug',e.target.value)}
                         style={{ flex:1, padding:'11px 14px', border:'none', background:'transparent', fontSize:14, color:'var(--text)', outline:'none' }} />
                     </div>
                   </div>
                   <Textarea label="Short Description *" {...F('description')} placeholder="1-2 sentence hook shown on cards and search results." rows={3} error={errors.description} required />
-                  <Textarea label="Full Description" {...F('longDescription')} placeholder="Describe what students will learn, who it's for, prerequisites, and what makes your course unique." rows={6} />
+                  {errors.slug&&<p style={{ fontSize:12, color:'var(--danger)', marginTop:-12, marginBottom:14 }}>{errors.slug}</p>}
+                  <Textarea label="Full Description *" error={errors.longDescription} required {...F('longDescription')} placeholder="Describe what students will learn, who it's for, prerequisites, and what makes your course unique." rows={6} />
                 </Card>
 
                 {/* Basic info */}
@@ -439,12 +487,12 @@ export default function CreateCoursePage() {
                     <Select label="Language" value={form.language} onChange={v=>sf('language',v)} options={LANGUAGES} />
                     <Select label="Category" value={form.category} onChange={v=>sf('category',v)} options={CATEGORIES} />
                     {form.type==='course'&&<Select label="Level" value={form.level} onChange={v=>sf('level',v)} options={LEVELS} />}
-                    {form.type==='course'&&<Input label="Total Duration" {...F('duration')} placeholder="e.g. 24 hours" />}
-                    {form.type==='ebook'&&<Input label="Number of Pages" {...F('pages')} placeholder="e.g. 220" />}
+                    {form.type==='course'&&<Input label="Total Duration *" {...F('duration')} placeholder="e.g. 4.5 hours" error={errors.duration} required />}
+                    {form.type==='ebook'&&<Input label="Number of Pages *" {...F('pages')} placeholder="e.g. 220" error={errors.pages} required />}
                     {form.type==='ebook'&&<Select label="File Format" value={form.format} onChange={v=>sf('format',v)} options={['PDF','ePub','PDF + ePub','PDF + ePub + Kindle']} />}
                   </FieldRow>
                   <Input label="Author / Instructor *" {...F('author')} placeholder="Your name or brand" icon="👤" error={errors.author} required />
-                  <Input label="Tags (comma-separated)" {...F('tags')} placeholder="e.g. React, JavaScript, Frontend, Hooks" hint="Helps learners discover your course through search." />
+                  <Input label="Tags (comma-separated) *" error={errors.tags} required {...F('tags')} placeholder="e.g. React, JavaScript, Frontend, Hooks" hint="Helps learners discover your course through search." />
                 </Card>
 
                 {/* Image & video */}
@@ -452,7 +500,8 @@ export default function CreateCoursePage() {
                   <h3 style={{ fontSize:18, marginBottom:20 }}>Media</h3>
 
                   {/* Thumbnail */}
-                  <p style={{ fontSize:13, fontWeight:500, color:'var(--text2)', marginBottom:10 }}>Course Image</p>
+                  <p style={{ fontSize:13, fontWeight:500, color:'var(--text2)', marginBottom:10 }}>Cover Image <span style={{ color:'var(--danger)' }}>*</span></p>
+                  {errors.image&&<p style={{ fontSize:12, color:'var(--danger)', marginTop:-6, marginBottom:8 }}>{errors.image}</p>}
                   <div onClick={()=>imgRef.current?.click()}
                     style={{ border:`2px dashed ${imgPrev?'var(--accent)':'var(--border2)'}`, borderRadius:14, minHeight:160, cursor:'pointer', background:imgPrev?'var(--accent-bg)':'var(--bg)', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:10, transition:'all .2s', marginBottom:20, overflow:'hidden', position:'relative' }}
                     onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--accent)';e.currentTarget.style.background='var(--accent-bg)';}}
@@ -472,7 +521,7 @@ export default function CreateCoursePage() {
                   {imgPrev&&<button onClick={()=>{setImgFile(null);setImgPrev('');}} style={{ fontSize:13, color:'var(--danger)', background:'none', border:'none', cursor:'pointer', marginBottom:20 }}>✕ Remove image</button>}
 
                   {/* Promo video */}
-                  <Input label="Promotional Video URL" {...F('promoVideoUrl')} placeholder="https://youtube.com/watch?v=... or https://vimeo.com/..." icon="▶" hint="A short preview video shown on the landing page to boost conversions." />
+                  <Input label="Promotional Video URL (optional)" error={errors.promoVideoUrl} {...F('promoVideoUrl')} placeholder="https://youtube.com/watch?v=... or https://vimeo.com/..." icon="▶" hint="A short preview video shown on the landing page to boost conversions." />
 
                   {/* Color */}
                   <p style={{ fontSize:13, fontWeight:500, color:'var(--text2)', marginBottom:10 }}>Card Accent Color</p>
@@ -491,10 +540,8 @@ export default function CreateCoursePage() {
               <Card>
                 <SectionTitle sub="Set your price. You can change this anytime after publishing.">Pricing</SectionTitle>
                 <FieldRow>
-                  <Select label="Currency" value={form.currency} onChange={v=>sf('currency',v)} options={CURRENCIES.map(c=>({value:c.code,label:c.label}))} />
-                  <div />
-                  <Input label="Price *" {...F('price')} placeholder="e.g. 79" icon={CURRENCIES.find(c=>c.code===form.currency)?.symbol??'$'} error={errors.price} required hint="The price learners will pay." />
-                  <Input label="Compare-at Price" {...F('originalPrice')} placeholder="e.g. 149" icon={CURRENCIES.find(c=>c.code===form.currency)?.symbol??'$'} hint="Shows strikethrough to highlight a discount. Leave blank for no discount." />
+                  <Input label="Price *" {...F('price')} placeholder="e.g. 79" icon={CURRENCIES.find(c=>c.code===form.currency)?.symbol??'$'} error={errors.price} required hint="In US dollars. Enter 0 for a free product." />
+                  <Input label="Compare-at Price (optional)" error={errors.originalPrice} {...F('originalPrice')} placeholder="e.g. 149" icon={CURRENCIES.find(c=>c.code===form.currency)?.symbol??'$'} hint="Shows strikethrough to highlight a discount. Leave blank for no discount." />
                 </FieldRow>
 
                 {/* Preview */}
@@ -506,7 +553,7 @@ export default function CreateCoursePage() {
                     <div>
                       <p style={{ fontSize:14, fontWeight:600 }}>{form.title||'Your course title'}</p>
                       <div style={{ display:'flex', gap:10, alignItems:'center', marginTop:4 }}>
-                        <span style={{ fontSize:22, fontWeight:700, color:'var(--accent)' }}>{CURRENCIES.find(c=>c.code===form.currency)?.symbol}{form.price}</span>
+                        <span style={{ fontSize:22, fontWeight:700, color:'var(--accent-text)' }}>{CURRENCIES.find(c=>c.code===form.currency)?.symbol}{form.price}</span>
                         {form.originalPrice&&<span style={{ fontSize:14, color:'var(--text3)', textDecoration:'line-through' }}>{CURRENCIES.find(c=>c.code===form.currency)?.symbol}{form.originalPrice}</span>}
                         {form.originalPrice&&<span style={{ fontSize:12, background:'var(--success-bg)', color:'var(--success)', borderRadius:99, padding:'2px 9px', fontWeight:700 }}>
                           -{Math.round((1-form.price/form.originalPrice)*100)}% off
@@ -516,54 +563,38 @@ export default function CreateCoursePage() {
                   </div>
                 )}
 
-                <InfoBox>Courses priced between $49–$99 perform best on EduVault. Adding a compare-at price significantly increases perceived value and conversion rates.</InfoBox>
+                <InfoBox>Tip: a compare-at price shows buyers the discount they're getting. Leave it blank if the product isn't on sale.</InfoBox>
               </Card>
             )}
 
-            {/* STEP 4 — Promotions */}
+            {/* STEP 4 — Messages */}
             {step===4&&(
-              <Card>
-                <SectionTitle sub="Attach existing coupon codes to offer discounts on this course.">Promotions & Coupons</SectionTitle>
-                <p style={{ fontSize:14, color:'var(--text2)', marginBottom:20, lineHeight:1.65 }}>
-                  Enter coupon codes you've created in the <Link to="/admin" style={{ color:'var(--accent)' }}>Admin Dashboard</Link>. Learners can apply these at checkout for a discount on this course specifically.
-                </p>
-                <CouponPicker value={form.coupons} onChange={v=>sf('coupons',v)} />
-                {form.coupons.length===0&&(
-                  <InfoBox icon="🎫" color="var(--text3)" bg="var(--bg3)" border="var(--border)">
-                    No coupons attached yet. You can add them now or after publishing.
-                  </InfoBox>
-                )}
-              </Card>
-            )}
-
-            {/* STEP 5 — Messages */}
-            {step===5&&(
               <Card>
                 <SectionTitle sub="These messages are shown to students at key moments in their learning journey.">Course Messages</SectionTitle>
                 <div style={{ marginBottom:28 }}>
                   <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
                     <div style={{ width:36, height:36, borderRadius:9, background:'var(--success-bg)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>👋</div>
                     <div>
-                      <p style={{ fontSize:15, fontWeight:600 }}>Welcome Message</p>
-                      <p style={{ fontSize:13, color:'var(--text3)' }}>Sent to students right after they enroll</p>
+                      <p style={{ fontSize:15, fontWeight:600 }}>Welcome Message <span style={{ color:'var(--danger)' }}>*</span></p>
+                      <p style={{ fontSize:13, color:'var(--text2)' }}>Shown to buyers when they open the {form.type==='ebook'?'eBook page':'course'} for the first time</p>
                     </div>
                   </div>
-                  <Textarea {...F('welcomeMessage')} placeholder="Welcome to the course! I'm so excited to have you here. In this course you'll learn..." rows={5} />
+                  <Textarea error={errors.welcomeMessage} {...F('welcomeMessage')} placeholder="Welcome to the course! I'm so excited to have you here. In this course you'll learn..." rows={5} />
                 </div>
 
                 <div style={{ borderTop:'1px solid var(--border)', paddingTop:28 }}>
                   <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
                     <div style={{ width:36, height:36, borderRadius:9, background:'var(--gold-bg)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>🏆</div>
                     <div>
-                      <p style={{ fontSize:15, fontWeight:600 }}>Congratulations Message</p>
-                      <p style={{ fontSize:13, color:'var(--text3)' }}>Sent when a student completes the course</p>
+                      <p style={{ fontSize:15, fontWeight:600 }}>Congratulations Message <span style={{ color:'var(--danger)' }}>*</span></p>
+                      <p style={{ fontSize:13, color:'var(--text2)' }}>Shown when a student completes every lesson</p>
                     </div>
                   </div>
-                  <Textarea {...F('congratsMessage')} placeholder="Congratulations on completing the course! You've come a long way. Here's what you can do next..." rows={5} />
+                  <Textarea error={errors.congratsMessage} {...F('congratsMessage')} placeholder="Congratulations on completing the course! You've come a long way. Here's what you can do next..." rows={5} />
                 </div>
 
                 <InfoBox icon="✨" color="var(--success)" bg="var(--success-bg)" border="var(--success-border)">
-                  Personalized messages increase student engagement and completion rates by up to 30%. They also improve your course reviews.
+                  A personal welcome and a congratulations note make the experience feel human — keep them short and friendly.
                 </InfoBox>
               </Card>
             )}

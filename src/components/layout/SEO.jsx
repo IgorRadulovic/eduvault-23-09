@@ -4,7 +4,7 @@
 import { useEffect } from 'react';
 
 const SITE_NAME  = 'EduVault';
-const SITE_URL   = import.meta.env.VITE_SITE_URL ?? 'https://eduvault.com';
+const SITE_URL   = import.meta.env.VITE_SITE_URL ?? 'https://eduvault.co';
 const DEFAULT_OG = '/logo.png';
 
 export default function SEO({ title, description, image, noIndex }) {

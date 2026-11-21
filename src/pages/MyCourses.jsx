@@ -84,9 +84,9 @@ export default function MyCourses() {
                         <Link to={`/product/${p.slug}`}><Button variant="secondary" size="sm">Details</Button></Link>
                       </div>
                     ) : (
-                      <Link to={`/product/${p.slug}`}>
+                      <Link to={`/learn/${p.slug}`}>
                         <Button variant={enr.progress===100?'success':'primary'} size="sm" full>
-                          {enr.progress===100?'✓ Review Course':'Continue Learning →'}
+                          {enr.progress===100?'✓ Review course':enr.progress>0?'Continue learning →':'Start course →'}
                         </Button>
                       </Link>
                     )}

@@ -69,7 +69,7 @@ export default function CatalogPage({ type }) {
               <p style={{ fontSize:12, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.7px', marginBottom:14 }}>Category</p>
               {['All',...CATEGORIES.filter(c=>c!=='All')].map(c => (
                 <button key={c} onClick={()=>setCategory(c)}
-                  style={{ display:'block', width:'100%', textAlign:'left', padding:'8px 10px', borderRadius:8, border:'none', background:category===c?'var(--accent-bg)':'transparent', color:category===c?'var(--accent)':'var(--text2)', fontSize:14, fontWeight:category===c?600:400, cursor:'pointer', marginBottom:2, transition:'all .15s' }}>
+                  style={{ display:'block', width:'100%', textAlign:'left', padding:'8px 10px', borderRadius:8, border:'none', background:category===c?'var(--accent-bg)':'transparent', color:category===c?'var(--accent-text)':'var(--text2)', fontSize:14, fontWeight:category===c?600:400, cursor:'pointer', marginBottom:2, transition:'all .15s' }}>
                   {c}
                 </button>
               ))}
@@ -78,7 +78,7 @@ export default function CatalogPage({ type }) {
               <p style={{ fontSize:12, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.7px', marginBottom:14 }}>Sort by</p>
               {SORTS.map(([v,l]) => (
                 <button key={v} onClick={()=>setSort(v)}
-                  style={{ display:'block', width:'100%', textAlign:'left', padding:'8px 10px', borderRadius:8, border:'none', background:sort===v?'var(--accent-bg)':'transparent', color:sort===v?'var(--accent)':'var(--text2)', fontSize:14, fontWeight:sort===v?600:400, cursor:'pointer', marginBottom:2, transition:'all .15s' }}>
+                  style={{ display:'block', width:'100%', textAlign:'left', padding:'8px 10px', borderRadius:8, border:'none', background:sort===v?'var(--accent-bg)':'transparent', color:sort===v?'var(--accent-text)':'var(--text2)', fontSize:14, fontWeight:sort===v?600:400, cursor:'pointer', marginBottom:2, transition:'all .15s' }}>
                   {l}
                 </button>
               ))}

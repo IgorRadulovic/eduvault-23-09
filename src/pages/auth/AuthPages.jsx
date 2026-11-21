@@ -132,7 +132,7 @@ export function LoginPage() {
         placeholder="Enter your password" icon="🔒" error={errors.password} autoComplete="current-password" required />
 
       <div style={{ textAlign:'right', marginBottom:22, marginTop:-8 }}>
-        <Link to="/forgot-password" style={{ fontSize:13, color:'var(--accent)', fontWeight:500 }}>
+        <Link to="/forgot-password" style={{ fontSize:13, color:'var(--accent-text)', fontWeight:500 }}>
           Forgot password?
         </Link>
       </div>
@@ -143,7 +143,7 @@ export function LoginPage() {
 
       <p style={{ textAlign:'center', marginTop:20, fontSize:13, color:'var(--text2)' }}>
         Don't have an account?{' '}
-        <Link to="/signup" style={{ color:'var(--accent)', fontWeight:600 }}>Create one →</Link>
+        <Link to="/signup" style={{ color:'var(--accent-text)', fontWeight:600 }}>Create one →</Link>
       </p>
     </AuthCard>
   );
@@ -221,13 +221,13 @@ export function SignupPage() {
 
       <p style={{ textAlign:'center', marginTop:20, fontSize:13, color:'var(--text2)' }}>
         Already have an account?{' '}
-        <Link to="/login" style={{ color:'var(--accent)', fontWeight:600 }}>Sign in →</Link>
+        <Link to="/login" style={{ color:'var(--accent-text)', fontWeight:600 }}>Sign in →</Link>
       </p>
 
       <p style={{ textAlign:'center', marginTop:14, fontSize:12, color:'var(--text3)' }}>
         By signing up you agree to our{' '}
-        <a href="#" style={{ color:'var(--accent)' }}>Terms</a> and{' '}
-        <a href="#" style={{ color:'var(--accent)' }}>Privacy Policy</a>.
+        <a href="#" style={{ color:'var(--accent-text)' }}>Terms</a> and{' '}
+        <a href="#" style={{ color:'var(--accent-text)' }}>Privacy Policy</a>.
       </p>
     </AuthCard>
   );
@@ -285,7 +285,7 @@ export function ForgotPasswordPage() {
             Send Reset Link
           </Button>
           <p style={{ textAlign:'center', marginTop:18, fontSize:13 }}>
-            <Link to="/login" style={{ color:'var(--accent)' }}>← Back to Sign In</Link>
+            <Link to="/login" style={{ color:'var(--accent-text)' }}>← Back to Sign In</Link>
           </p>
         </>
       )}

@@ -6,4 +6,4 @@ Disallow: /checkout
 Disallow: /my-courses
 Disallow: /cart
 
-Sitemap: https://eduvault.com/sitemap.xml
+Sitemap: https://eduvault.co/sitemap.xml

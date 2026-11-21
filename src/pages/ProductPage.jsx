@@ -86,8 +86,8 @@ export default function ProductPage() {
 
       <div className="page" style={{ paddingTop: 28, paddingBottom: 80 }}>
         <nav aria-label="Breadcrumb" style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 24, fontSize: 14, color: 'var(--text2)', flexWrap: 'wrap' }}>
-          <Link to={isEbook ? '/ebooks' : '/courses'} style={{ color: 'var(--accent)' }}>{isEbook ? 'eBooks' : 'Courses'}</Link>
-          {product.category && <><span aria-hidden="true">/</span><Link to={`${isEbook ? '/ebooks' : '/courses'}?cat=${encodeURIComponent(product.category)}`} style={{ color: 'var(--accent)' }}>{product.category}</Link></>}
+          <Link to={isEbook ? '/ebooks' : '/courses'} style={{ color: 'var(--accent-text)' }}>{isEbook ? 'eBooks' : 'Courses'}</Link>
+          {product.category && <><span aria-hidden="true">/</span><Link to={`${isEbook ? '/ebooks' : '/courses'}?cat=${encodeURIComponent(product.category)}`} style={{ color: 'var(--accent-text)' }}>{product.category}</Link></>}
           <span aria-hidden="true">/</span>
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 320 }}>{product.title}</span>
         </nav>
@@ -128,7 +128,7 @@ export default function ProductPage() {
                 {sections.map((s, i) => (
                   <div key={s.id ?? i} style={{ padding: '14px 0', borderTop: '1px solid var(--border)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                      <span style={{ width: 30, fontFamily: 'Fraunces, serif', fontSize: 18, fontWeight: 600, color: 'var(--accent)' }}>{String(i + 1).padStart(2, '0')}</span>
+                      <span style={{ width: 30, fontFamily: 'Fraunces, serif', fontSize: 18, fontWeight: 600, color: 'var(--accent-text)' }}>{String(i + 1).padStart(2, '0')}</span>
                       <span style={{ flex: 1, fontSize: 15, fontWeight: 600 }}>{s.title}</span>
                       {s.lectures?.length > 0 && <span style={{ fontSize: 14, color: 'var(--text2)' }}>{plural(s.lectures.length, isEbook ? 'part' : 'lecture')}</span>}
                     </div>
@@ -174,9 +174,9 @@ export default function ProductPage() {
                     ? <Button variant="success" size="lg" full loading={downloading} onClick={download}><Icon name="download" size={18} /> Download</Button>
                     : <p style={{ fontSize: 14, color: 'var(--text2)' }}>The author hasn’t uploaded the file yet. It will appear here and in My Courses.</p>
                 ) : (
-                  <Link to="/my-courses"><Button variant="success" size="lg" full>Go to My Courses</Button></Link>
+                  <Link to={`/learn/${product.slug}`}><Button variant="success" size="lg" full><Icon name="play" size={16} /> {owned.progress > 0 ? 'Continue learning' : 'Start course'}</Button></Link>
                 )}
-                {isEbook && <p style={{ fontSize: 13, color: 'var(--text2)', marginTop: 14, lineHeight: 1.6 }}>Download as often as you like. You’ll also find it in <Link to="/my-courses" style={{ color: 'var(--accent)', fontWeight: 600 }}>My Courses</Link>.</p>}
+                {isEbook && <p style={{ fontSize: 13, color: 'var(--text2)', marginTop: 14, lineHeight: 1.6 }}>Download as often as you like. You’ll also find it in <Link to="/my-courses" style={{ color: 'var(--accent-text)', fontWeight: 600 }}>My Courses</Link>.</p>}
               </div>
             ) : (
               <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 18, padding: 26, boxShadow: 'var(--shadow)' }}>

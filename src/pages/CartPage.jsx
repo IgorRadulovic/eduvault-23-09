@@ -61,7 +61,7 @@ export default function CartPage() {
                     <Badge variant={item.type==='ebook'?'info':'accent'} size="xs">{item.type==='ebook'?'eBook':'Course'}</Badge>
                   </div>
                   <div style={{ textAlign:'right', flexShrink:0 }}>
-                    <p style={{ fontSize:18, fontWeight:700, color:'var(--accent)', marginBottom:2 }}>{fmt$(item.price)}</p>
+                    <p style={{ fontSize:18, fontWeight:700, color:'var(--accent-text)', marginBottom:2 }}>{fmt$(item.price)}</p>
                     <p style={{ fontSize:12, color:'var(--text3)', textDecoration:'line-through', marginBottom:8 }}>{fmt$(item.originalPrice)}</p>
                     <button onClick={() => { removeItem(item.id); toast.info('Item removed.'); }} style={{ fontSize:12, color:'var(--danger)', background:'none', border:'none', cursor:'pointer' }}>
                       🗑 Remove
@@ -94,7 +94,7 @@ export default function CartPage() {
 
             <div style={{ borderTop:'1px solid var(--border)', marginTop:16, paddingTop:16, display:'flex', justifyContent:'space-between', marginBottom:22 }}>
               <span style={{ fontSize:17, fontWeight:700 }}>Total</span>
-              <span style={{ fontSize:22, fontWeight:700, color:'var(--accent)' }}>{fmt$(total)}</span>
+              <span style={{ fontSize:22, fontWeight:700, color:'var(--accent-text)' }}>{fmt$(total)}</span>
             </div>
 
             {/* Coupon */}

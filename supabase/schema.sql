@@ -223,6 +223,10 @@ create table if not exists public.enrollments (
   unique(user_id, product_id)
 );
 
+-- Lecture ids the student has marked complete (progress is derived from it)
+alter table public.enrollments
+  add column if not exists completed_lectures jsonb not null default '[]';
+
 create index if not exists idx_enrollments_user    on public.enrollments(user_id);
 create index if not exists idx_enrollments_product on public.enrollments(product_id);
 

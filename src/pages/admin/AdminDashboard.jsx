@@ -8,7 +8,7 @@ import {
   updateUserRole, updateUserStatus, deleteUser,
   createCoupon, updateCoupon, deleteCoupon,
 } from '../../api/services';
-import { REVENUE_BY_MONTH, CATEGORIES } from '../../api/mockData';
+import { CATEGORIES } from '../../api/mockData';
 import {
   Button, Badge, Modal, Input, Select, Textarea,
   Confirm, StatCard, Spinner, Table,
@@ -36,7 +36,7 @@ function Sidebar({ active, setActive, user, dark, toggleDark }) {
       <nav style={{ padding: '10px 8px', flex: 1 }}>
         {TABS.map(t => (
           <button key={t.id} onClick={() => setActive(t.id)}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 13px', borderRadius: 10, border: 'none', background: active === t.id ? 'var(--accent-bg)' : 'transparent', color: active === t.id ? 'var(--accent)' : 'var(--text2)', fontWeight: active === t.id ? 600 : 400, fontSize: 14, cursor: 'pointer', marginBottom: 2, textAlign: 'left', transition: 'background .15s' }}>
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 13px', borderRadius: 10, border: 'none', background: active === t.id ? 'var(--accent-bg)' : 'transparent', color: active === t.id ? 'var(--accent-text)' : 'var(--text2)', fontWeight: active === t.id ? 600 : 400, fontSize: 14, cursor: 'pointer', marginBottom: 2, textAlign: 'left', transition: 'background .15s' }}>
             <span style={{ fontSize: 17 }}>{t.icon}</span><span>{t.label}</span>
           </button>
         ))}
@@ -65,13 +65,21 @@ function Overview() {
   const [userCount, setUserCount] = useState(null);
   useEffect(() => {
     getOrderStats().then(setStats);
-    getOrders().then(d => setOrders(d.orders.slice(0, 5)));
+    getOrders().then(d => setOrders(d.orders));
     getProducts({ limit: 200 }).then(d => setProducts(d.products));
     getUsers().then(d => setUserCount(d.total));
   }, []);
   const topProducts = [...products].sort((a, b) => b.students - a.students).slice(0, 5);
   const maxStudents = Math.max(1, ...topProducts.map(p => p.students));
-  const maxR = Math.max(...REVENUE_BY_MONTH.map(m => m.revenue));
+  // Completed-order revenue for each of the last 12 months, from real orders
+  const months = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 11 + i);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const revenue = orders.filter(o => o.status === 'completed' && o.date.startsWith(key)).reduce((a, o) => a + o.amount, 0);
+    return { month: d.toLocaleString('en-US', { month: 'short' }), revenue };
+  });
+  const REVENUE_BY_MONTH = months;
+  const maxR = Math.max(1, ...months.map(m => m.revenue));
   return (
     <div style={{ padding: 28 }}>
       <div style={{ marginBottom: 28 }}>
@@ -102,7 +110,8 @@ function Overview() {
         </div>
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, padding: '22px 20px' }}>
           <h3 style={{ fontSize: 16, marginBottom: 16 }}>Recent Orders</h3>
-          {orders.map(o => (
+          {orders.length === 0 && <p style={{ fontSize: 13, color: 'var(--text3)' }}>No orders yet.</p>}
+          {orders.slice(0, 5).map(o => (
             <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 0', borderBottom: '1px solid var(--border)' }}>
               <div>
                 <p style={{ fontSize: 13, fontWeight: 500 }}>{o.user.split(' ')[0]} · {o.id}</p>
@@ -209,7 +218,7 @@ function Products() {
       </div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
         {[['all', 'All'], ['course', 'Courses'], ['ebook', 'eBooks']].map(([v, l]) => (
-          <button key={v} onClick={() => setTypeFilter(v)} style={{ padding: '7px 16px', borderRadius: 99, border: `1px solid ${typeFilter === v ? 'var(--accent)' : 'var(--border)'}`, background: typeFilter === v ? 'var(--accent-bg)' : 'var(--bg2)', color: typeFilter === v ? 'var(--accent)' : 'var(--text2)', fontSize: 13, fontWeight: typeFilter === v ? 600 : 400, cursor: 'pointer' }}>{l}</button>
+          <button key={v} onClick={() => setTypeFilter(v)} style={{ padding: '7px 16px', borderRadius: 99, border: `1px solid ${typeFilter === v ? 'var(--accent)' : 'var(--border)'}`, background: typeFilter === v ? 'var(--accent-bg)' : 'var(--bg2)', color: typeFilter === v ? 'var(--accent-text)' : 'var(--text2)', fontSize: 13, fontWeight: typeFilter === v ? 600 : 400, cursor: 'pointer' }}>{l}</button>
         ))}
       </div>
       {loading ? <div style={{ padding: 60, display: 'flex', justifyContent: 'center' }}><Spinner /></div> : (
@@ -219,7 +228,7 @@ function Products() {
             { label: 'Type', render: p => <Badge variant={p.type === 'ebook' ? 'info' : 'accent'} size="xs">{p.type}</Badge> },
             { label: 'Status', render: p => <Badge variant={p.isPublished ? 'success' : 'gold'} size="xs">{p.isPublished ? 'published' : 'draft'}</Badge> },
             { label: 'Category', key: 'category' },
-            { label: 'Price', render: p => <><span style={{ fontWeight: 700, color: 'var(--accent)' }}>{fmt$(p.price)}</span><span style={{ fontSize: 12, color: 'var(--text3)', textDecoration: 'line-through', marginLeft: 6 }}>{fmt$(p.originalPrice)}</span></> },
+            { label: 'Price', render: p => <><span style={{ fontWeight: 700, color: 'var(--accent-text)' }}>{fmt$(p.price)}</span><span style={{ fontSize: 12, color: 'var(--text3)', textDecoration: 'line-through', marginLeft: 6 }}>{fmt$(p.originalPrice)}</span></> },
             { label: 'Students', render: p => fmtN(p.students) },
             { label: 'Rating', render: p => `⭐ ${p.rating}` },
             { label: 'Actions', render: p => <div style={{ display: 'flex', gap: 6 }}><button onClick={() => openEdit(p)} style={{ background: 'var(--info-bg)', border: 'none', borderRadius: 7, padding: '6px 10px', cursor: 'pointer' }}>✏️</button><button onClick={() => setDelId(p.id)} style={{ background: 'var(--danger-bg)', border: 'none', borderRadius: 7, padding: '6px 10px', cursor: 'pointer' }}>🗑</button></div> },
@@ -284,13 +293,13 @@ function Orders() {
       )}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
         {[['all','All'],['completed','Completed'],['pending','Pending'],['refunded','Refunded']].map(([v, l]) => (
-          <button key={v} onClick={() => setFilter(v)} style={{ padding: '7px 16px', borderRadius: 99, border: `1px solid ${filter === v ? 'var(--accent)' : 'var(--border)'}`, background: filter === v ? 'var(--accent-bg)' : 'var(--bg2)', color: filter === v ? 'var(--accent)' : 'var(--text2)', fontSize: 13, fontWeight: filter === v ? 600 : 400, cursor: 'pointer' }}>{l}</button>
+          <button key={v} onClick={() => setFilter(v)} style={{ padding: '7px 16px', borderRadius: 99, border: `1px solid ${filter === v ? 'var(--accent)' : 'var(--border)'}`, background: filter === v ? 'var(--accent-bg)' : 'var(--bg2)', color: filter === v ? 'var(--accent-text)' : 'var(--text2)', fontSize: 13, fontWeight: filter === v ? 600 : 400, cursor: 'pointer' }}>{l}</button>
         ))}
       </div>
       {loading ? <div style={{ padding: 60, display: 'flex', justifyContent: 'center' }}><Spinner /></div> : (
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
           <Table cols={[
-            { label: 'Order ID', render: o => <span style={{ fontWeight: 600, color: 'var(--accent)', fontSize: 13 }}>{o.id}</span> },
+            { label: 'Order ID', render: o => <span style={{ fontWeight: 600, color: 'var(--accent-text)', fontSize: 13 }}>{o.id}</span> },
             { label: 'Customer', render: o => <div><p style={{ fontSize: 13, fontWeight: 500 }}>{o.user}</p><p style={{ fontSize: 12, color: 'var(--text3)' }}>{o.email}</p></div> },
             { label: 'Item', render: o => <span style={{ fontSize: 13 }}>{o.item.slice(0, 28)}{o.item.length > 28 ? '…' : ''}</span> },
             { label: 'Amount', render: o => <span style={{ fontWeight: 700, fontSize: 14 }}>{fmt$(o.amount)}</span> },
@@ -410,7 +419,7 @@ function Coupons() {
             <div key={c.id} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, padding: '22px 20px', opacity: c.active ? 1 : 0.65 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
                 <div style={{ background: 'var(--bg3)', border: '2px dashed var(--border2)', borderRadius: 9, padding: '8px 16px' }}>
-                  <p style={{ fontSize: 18, fontWeight: 700, fontFamily: 'Fraunces,serif', letterSpacing: '1px', color: 'var(--accent)' }}>{c.code}</p>
+                  <p style={{ fontSize: 18, fontWeight: 700, fontFamily: 'Fraunces,serif', letterSpacing: '1px', color: 'var(--accent-text)' }}>{c.code}</p>
                 </div>
                 <Badge variant={c.active ? 'success' : 'danger'} size="xs" dot>{c.active ? 'Active' : 'Inactive'}</Badge>
               </div>

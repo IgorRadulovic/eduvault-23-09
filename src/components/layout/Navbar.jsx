@@ -56,7 +56,7 @@ export default function Navbar() {
         <div style={{ flex:1, display:'flex', justifyContent:'center', gap:4 }} className="desktop-nav">
           {links.map(l => (
             <Link key={l.to} to={l.to}
-              style={{ padding:'8px 16px', borderRadius:8, fontSize:14, fontWeight:active(l.to)?600:400, color:active(l.to)?'var(--accent)':'var(--text2)', background:active(l.to)?'var(--accent-bg)':'transparent', transition:'all .18s' }}
+              style={{ padding:'8px 16px', borderRadius:8, fontSize:14, fontWeight:active(l.to)?600:400, color:active(l.to)?'var(--accent-text)':'var(--text2)', background:active(l.to)?'var(--accent-bg)':'transparent', transition:'all .18s' }}
               onMouseEnter={e=>{ if(!active(l.to)){e.currentTarget.style.background='var(--bg3)';e.currentTarget.style.color='var(--text)';} }}
               onMouseLeave={e=>{ if(!active(l.to)){e.currentTarget.style.background='transparent';e.currentTarget.style.color='var(--text2)';} }}>
               {l.label}
@@ -68,7 +68,7 @@ export default function Navbar() {
           {/* Create button — shown when logged in */}
           {user && (
             <Link to="/create">
-              <button style={{ padding:'7px 16px', borderRadius:8, border:'1.5px solid var(--accent)', background:'transparent', color:'var(--accent)', fontSize:13, fontWeight:600, cursor:'pointer', transition:'all .18s', display:'flex', alignItems:'center', gap:6 }}
+              <button style={{ padding:'7px 16px', borderRadius:8, border:'1.5px solid var(--accent)', background:'transparent', color:'var(--accent-text)', fontSize:13, fontWeight:600, cursor:'pointer', transition:'all .18s', display:'flex', alignItems:'center', gap:6 }}
                 onMouseEnter={e=>{e.currentTarget.style.background='var(--accent)';e.currentTarget.style.color='#fff';}}
                 onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='var(--accent)';}}>
                 + Create
@@ -161,11 +161,11 @@ export default function Navbar() {
       {mob && (
         <div className="fade-in" style={{ position:'absolute', top:'100%', left:0, right:0, background:'var(--bg2)', borderBottom:'1px solid var(--border)', padding:'12px 16px 20px', boxShadow:'var(--shadow-lg)', zIndex:199 }}>
           {links.map(l => (
-            <Link key={l.to} to={l.to} style={{ display:'block', padding:'11px 12px', borderRadius:8, fontSize:15, fontWeight:500, color:active(l.to)?'var(--accent)':'var(--text2)', marginBottom:4, background:active(l.to)?'var(--accent-bg)':'transparent' }}>
+            <Link key={l.to} to={l.to} style={{ display:'block', padding:'11px 12px', borderRadius:8, fontSize:15, fontWeight:500, color:active(l.to)?'var(--accent-text)':'var(--text2)', marginBottom:4, background:active(l.to)?'var(--accent-bg)':'transparent' }}>
               {l.label}
             </Link>
           ))}
-          {user && <Link to="/create" style={{ display:'block', padding:'11px 12px', borderRadius:8, fontSize:15, fontWeight:500, color:'var(--accent)', marginBottom:4 }}>+ Create</Link>}
+          {user && <Link to="/create" style={{ display:'block', padding:'11px 12px', borderRadius:8, fontSize:15, fontWeight:500, color:'var(--accent-text)', marginBottom:4 }}>+ Create</Link>}
           {!user && (
             <div style={{ display:'flex', gap:10, marginTop:12 }}>
               <Button variant="secondary" size="md" full onClick={()=>nav('/login')}>Sign In</Button>

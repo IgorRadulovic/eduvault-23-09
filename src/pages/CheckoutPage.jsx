@@ -88,7 +88,7 @@ export default function CheckoutPage() {
             <div style={{ width:80, height:80, borderRadius:'50%', background:'var(--success-bg)', border:'2px solid var(--success-border)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:36, margin:'0 auto 24px' }}>✓</div>
             <h2 style={{ fontSize:30, marginBottom:12 }}>Payment Successful!</h2>
             <p style={{ color:'var(--text2)', fontSize:15, marginBottom:8 }}>Thank you, {details.firstName}! Your order {order?.orderNumber} has been confirmed.</p>
-            <p style={{ color:'var(--text3)', fontSize:14, marginBottom:36 }}>A receipt has been sent to <strong>{details.email}</strong></p>
+            <p style={{ color:'var(--text3)', fontSize:14, marginBottom:36 }}>Your purchase is ready in <strong>My Courses</strong>.</p>
             <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:14, padding:'22px 24px', maxWidth:400, margin:'0 auto 36px', textAlign:'left' }}>
               <h3 style={{ fontSize:15, marginBottom:14 }}>Order Summary</h3>
               {!order?.items?.length
@@ -101,7 +101,7 @@ export default function CheckoutPage() {
                 ))
               }
               <div style={{ borderTop:'1px solid var(--border)', paddingTop:10, marginTop:10, display:'flex', justifyContent:'space-between', fontWeight:700, fontSize:15 }}>
-                <span>Total paid</span><span style={{ color:'var(--accent)' }}>{fmt$(order?.total ?? 0)}</span>
+                <span>Total paid</span><span style={{ color:'var(--accent-text)' }}>{fmt$(order?.total ?? 0)}</span>
               </div>
             </div>
             <div style={{ display:'flex', gap:12, justifyContent:'center' }}>
@@ -194,7 +194,7 @@ export default function CheckoutPage() {
                   </div>
                 )}
                 <div style={{ display:'flex', justifyContent:'space-between', fontSize:17, fontWeight:700, borderTop:'1px solid var(--border)', paddingTop:10, marginTop:4 }}>
-                  <span>Total</span><span style={{ color:'var(--accent)' }}>{fmt$(total)}</span>
+                  <span>Total</span><span style={{ color:'var(--accent-text)' }}>{fmt$(total)}</span>
                 </div>
               </div>
             </div>
