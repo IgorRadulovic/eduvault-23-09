@@ -5,10 +5,10 @@ import { useAuth, useTheme, toast } from '../../context';
 import {
   getOrderStats, getOrders, getUsers, getCoupons, getProducts,
   createProduct, updateProduct, deleteProduct,
-  createUser, updateUserStatus, deleteUser,
+  updateUserRole, updateUserStatus, deleteUser,
   createCoupon, updateCoupon, deleteCoupon,
 } from '../../api/services';
-import { MOCK_PRODUCTS, REVENUE_BY_MONTH, CATEGORIES } from '../../api/mockData';
+import { REVENUE_BY_MONTH, CATEGORIES } from '../../api/mockData';
 import {
   Button, Badge, Modal, Input, Select, Textarea,
   Confirm, StatCard, Spinner, Table,
@@ -60,10 +60,16 @@ function Sidebar({ active, setActive, user, dark, toggleDark }) {
 function Overview() {
   const [stats, setStats] = useState(null);
   const [orders, setOrders] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [userCount, setUserCount] = useState(null);
   useEffect(() => {
     getOrderStats().then(setStats);
     getOrders().then(d => setOrders(d.orders.slice(0, 5)));
+    getProducts({ limit: 200 }).then(d => setProducts(d.products));
+    getUsers().then(d => setUserCount(d.total));
   }, []);
+  const topProducts = [...products].sort((a, b) => b.students - a.students).slice(0, 5);
+  const maxStudents = Math.max(1, ...topProducts.map(p => p.students));
   const maxR = Math.max(...REVENUE_BY_MONTH.map(m => m.revenue));
   return (
     <div style={{ padding: 28 }}>
@@ -73,9 +79,9 @@ function Overview() {
       </div>
       {stats ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16, marginBottom: 28 }}>
-          <StatCard label="Total Revenue" value={fmt$(stats.revenue)} icon="💰" sub="↑ 12% this month" trend="up" />
-          <StatCard label="Total Students" value="50,284" icon="👥" sub="↑ 8% this week" trend="up" color="var(--info)" />
-          <StatCard label="Active Products" value={MOCK_PRODUCTS.length} icon="📚" color="var(--success)" />
+          <StatCard label="Total Revenue" value={fmt$(stats.revenue)} icon="💰" trend="up" />
+          <StatCard label="Registered Users" value={userCount ?? '—'} icon="👥" color="var(--info)" />
+          <StatCard label="Published Products" value={products.length} icon="📚" color="var(--success)" />
           <StatCard label="Pending Orders" value={stats.pending} icon="🛒" color="var(--gold)" />
         </div>
       ) : <div style={{ padding: 60, display: 'flex', justifyContent: 'center' }}><Spinner /></div>}
@@ -98,7 +104,7 @@ function Overview() {
           {orders.map(o => (
             <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 0', borderBottom: '1px solid var(--border)' }}>
               <div>
-                <p style={{ fontSize: 13, fontWeight: 500 }}>{o.user.split(' ')[0]}</p>
+                <p style={{ fontSize: 13, fontWeight: 500 }}>{o.user.split(' ')[0]} · {o.id}</p>
                 <p style={{ fontSize: 11, color: 'var(--text3)' }}>{o.item.slice(0, 22)}…</p>
               </div>
               <div style={{ textAlign: 'right' }}>
@@ -112,7 +118,7 @@ function Overview() {
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, padding: '22px 24px' }}>
         <h3 style={{ fontSize: 16, marginBottom: 18 }}>Top Products by Enrollment</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {[...MOCK_PRODUCTS].sort((a, b) => b.students - a.students).slice(0, 5).map(p => (
+          {topProducts.map(p => (
             <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
               <span style={{ fontSize: 22, flexShrink: 0 }}>{p.emoji}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -121,7 +127,7 @@ function Overview() {
                   <span style={{ fontSize: 13, color: 'var(--text3)', flexShrink: 0 }}>{fmtN(p.students)}</span>
                 </div>
                 <div style={{ background: 'var(--bg3)', borderRadius: 99, height: 6 }}>
-                  <div style={{ width: `${(p.students / 18300) * 100}%`, height: 6, borderRadius: 99, background: 'var(--accent)' }} />
+                  <div style={{ width: `${(p.students / maxStudents) * 100}%`, height: 6, borderRadius: 99, background: 'var(--accent)' }} />
                 </div>
               </div>
             </div>
@@ -132,7 +138,7 @@ function Overview() {
   );
 }
 
-const EMPTY_P = { title: '', author: '', price: '', originalPrice: '', category: 'Development', type: 'course', description: '', emoji: '📚', level: 'Beginner', duration: '', lessons: '', pages: '', format: 'PDF + ePub', tags: '', bestseller: false, featured: false };
+const EMPTY_P = { title: '', author: '', price: '', originalPrice: '', category: 'Development', type: 'course', description: '', emoji: '📚', level: 'Beginner', duration: '', lessons: '', pages: '', format: 'PDF + ePub', tags: '', bestseller: false, featured: false, isPublished: true };
 
 function Products() {
   const [items, setItems] = useState([]);
@@ -146,7 +152,7 @@ function Products() {
   const [typeFilter, setTypeFilter] = useState('all');
   const sf = k => v => setForm(f => ({ ...f, [k]: v }));
 
-  useEffect(() => { getProducts({ limit: 50 }).then(d => { setItems(d.products); setLoading(false); }); }, []);
+  useEffect(() => { getProducts({ limit: 200, includeDrafts: true }).then(d => { setItems(d.products); setLoading(false); }); }, []);
 
   function openAdd() { setEditing(null); setForm(EMPTY_P); setModal(true); }
   function openEdit(item) {
@@ -161,13 +167,12 @@ function Products() {
     const payload = { ...form, price: Number(form.price), originalPrice: Number(form.originalPrice), lessons: Number(form.lessons) || undefined, pages: Number(form.pages) || undefined, tags: form.tags.split(',').map(t => t.trim()).filter(Boolean) };
     try {
       if (editing) {
-        await updateProduct(editing.id, payload);
-        setItems(i => i.map(x => x.id === editing.id ? { ...x, ...payload } : x));
+        const saved = await updateProduct(editing.id, payload);
+        setItems(i => i.map(x => x.id === editing.id ? saved : x));
         toast.success('Product updated.');
       } else {
-        const fresh = { ...payload, id: String(Date.now()), students: 0, rating: 0, reviewCount: 0, slug: payload.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'), color: '#1a6bc8', lastUpdated: new Date().toISOString().split('T')[0] };
-        await createProduct(fresh);
-        setItems(i => [...i, fresh]);
+        const saved = await createProduct({ ...payload, color: '#1a6bc8', lastUpdated: new Date().toISOString().split('T')[0] });
+        setItems(i => [...i, saved]);
         toast.success('Product created.');
       }
       setModal(false);
@@ -177,10 +182,12 @@ function Products() {
 
   async function handleDelete() {
     setDelLoad(true);
-    await deleteProduct(delId);
-    setItems(i => i.filter(x => x.id !== delId));
-    setDelId(null); setDelLoad(false);
-    toast.success('Product deleted.');
+    try {
+      await deleteProduct(delId);
+      setItems(i => i.filter(x => x.id !== delId));
+      toast.success('Product deleted.');
+    } catch (e) { toast.error(e.message); }
+    finally { setDelId(null); setDelLoad(false); }
   }
 
   const shown = typeFilter === 'all' ? items : items.filter(p => p.type === typeFilter);
@@ -201,6 +208,7 @@ function Products() {
           <Table cols={[
             { label: 'Product', render: p => <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><span style={{ fontSize: 26 }}>{p.emoji}</span><div><p style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{p.title}</p><p style={{ fontSize: 12, color: 'var(--text3)' }}>by {p.author}</p></div></div> },
             { label: 'Type', render: p => <Badge variant={p.type === 'ebook' ? 'info' : 'accent'} size="xs">{p.type}</Badge> },
+            { label: 'Status', render: p => <Badge variant={p.isPublished ? 'success' : 'gold'} size="xs">{p.isPublished ? 'published' : 'draft'}</Badge> },
             { label: 'Category', key: 'category' },
             { label: 'Price', render: p => <><span style={{ fontWeight: 700, color: 'var(--accent)' }}>{fmt$(p.price)}</span><span style={{ fontSize: 12, color: 'var(--text3)', textDecoration: 'line-through', marginLeft: 6 }}>{fmt$(p.originalPrice)}</span></> },
             { label: 'Students', render: p => fmtN(p.students) },
@@ -231,7 +239,7 @@ function Products() {
           <Input label="Tags (comma-separated)" value={form.tags} onChange={sf('tags')} placeholder="React, JavaScript" style={{ gridColumn: '1/-1' }} />
           <Textarea label="Description" value={form.description} onChange={sf('description')} placeholder="Short description…" rows={3} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '6px 0' }}>
-            {[['bestseller', '⭐ Mark as Bestseller'], ['featured', '📌 Mark as Featured']].map(([k, l]) => (
+            {[['isPublished', '🌐 Published (visible to students)'], ['bestseller', '⭐ Mark as Bestseller'], ['featured', '📌 Mark as Featured']].map(([k, l]) => (
               <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 14 }}>
                 <input type="checkbox" checked={!!form[k]} onChange={e => sf(k)(e.target.checked)} style={{ width: 16, height: 16, accentColor: 'var(--accent)' }} />{l}
               </label>
@@ -283,46 +291,45 @@ function Orders() {
   );
 }
 
+// Users sign up themselves (Firebase). Admins manage roles and status here.
 function Users() {
+  const { user: me } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({ name: '', email: '', role: 'student', password: '' });
-  const [saving, setSaving] = useState(false);
   const [delId, setDelId] = useState(null);
-  const sf = k => v => setForm(f => ({ ...f, [k]: v }));
   useEffect(() => { getUsers().then(d => { setUsers(d.users); setLoading(false); }); }, []);
-
-  async function handleAdd() {
-    setSaving(true);
-    try {
-      const u = { ...form, id: String(Date.now()), joined: new Date().toISOString().split('T')[0], status: 'active', avatar: null, enrolledCourses: [] };
-      await createUser(u);
-      setUsers(prev => [...prev, u]);
-      setModal(false); setForm({ name: '', email: '', role: 'student', password: '' });
-      toast.success('User created.');
-    } catch (e) { toast.error(e.message); }
-    finally { setSaving(false); }
-  }
 
   async function toggleStatus(u) {
     const ns = u.status === 'active' ? 'suspended' : 'active';
-    await updateUserStatus(u.id, ns);
-    setUsers(prev => prev.map(x => x.id === u.id ? { ...x, status: ns } : x));
-    toast.success(`User ${ns}.`);
+    try {
+      await updateUserStatus(u.id, ns);
+      setUsers(prev => prev.map(x => x.id === u.id ? { ...x, status: ns } : x));
+      toast.success(`User ${ns}.`);
+    } catch (e) { toast.error(e.message); }
+  }
+
+  async function toggleRole(u) {
+    const nr = u.role === 'admin' ? 'student' : 'admin';
+    try {
+      await updateUserRole(u.id, nr);
+      setUsers(prev => prev.map(x => x.id === u.id ? { ...x, role: nr } : x));
+      toast.success(`${u.name} is now ${nr === 'admin' ? 'an admin' : 'a student'}.`);
+    } catch (e) { toast.error(e.message); }
   }
 
   async function handleDelete() {
-    await deleteUser(delId);
-    setUsers(prev => prev.filter(x => x.id !== delId));
-    setDelId(null); toast.success('User deleted.');
+    try {
+      await deleteUser(delId);
+      setUsers(prev => prev.filter(x => x.id !== delId));
+      toast.success('User deleted.');
+    } catch (e) { toast.error(e.message); }
+    finally { setDelId(null); }
   }
 
   return (
     <div style={{ padding: 28 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 22 }}>
-        <div><h2 style={{ fontSize: 26, marginBottom: 4 }}>Users</h2><p style={{ color: 'var(--text3)', fontSize: 14 }}>{users.length} registered users</p></div>
-        <Button variant="primary" onClick={() => setModal(true)}>+ Add User</Button>
+        <div><h2 style={{ fontSize: 26, marginBottom: 4 }}>Users</h2><p style={{ color: 'var(--text3)', fontSize: 14 }}>{users.length} registered users · new users appear here after they sign up</p></div>
       </div>
       {loading ? <div style={{ padding: 60, display: 'flex', justifyContent: 'center' }}><Spinner /></div> : (
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
@@ -332,18 +339,11 @@ function Users() {
             { label: 'Role', render: u => <Badge variant={u.role === 'admin' ? 'gold' : 'info'} size="xs">{u.role}</Badge> },
             { label: 'Joined', key: 'joined' },
             { label: 'Status', render: u => <Badge variant={u.status === 'active' ? 'success' : 'danger'} size="xs" dot>{u.status}</Badge> },
-            { label: 'Actions', render: u => <div style={{ display: 'flex', gap: 6 }}><button onClick={() => toggleStatus(u)} style={{ padding: '5px 10px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 7, cursor: 'pointer', fontSize: 12, color: 'var(--text2)', whiteSpace: 'nowrap' }}>{u.status === 'active' ? 'Suspend' : 'Activate'}</button><button onClick={() => setDelId(u.id)} style={{ background: 'var(--danger-bg)', border: 'none', borderRadius: 7, padding: '6px 10px', cursor: 'pointer' }}>🗑</button></div> },
+            { label: 'Actions', render: u => u.id === me?.id ? <span style={{ fontSize: 12, color: 'var(--text3)' }}>You</span> : <div style={{ display: 'flex', gap: 6 }}><button onClick={() => toggleRole(u)} style={{ padding: '5px 10px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 7, cursor: 'pointer', fontSize: 12, color: 'var(--text2)', whiteSpace: 'nowrap' }}>{u.role === 'admin' ? 'Make student' : 'Make admin'}</button><button onClick={() => toggleStatus(u)} style={{ padding: '5px 10px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 7, cursor: 'pointer', fontSize: 12, color: 'var(--text2)', whiteSpace: 'nowrap' }}>{u.status === 'active' ? 'Suspend' : 'Activate'}</button><button onClick={() => setDelId(u.id)} style={{ background: 'var(--danger-bg)', border: 'none', borderRadius: 7, padding: '6px 10px', cursor: 'pointer' }}>🗑</button></div> },
           ]} rows={users} />
         </div>
       )}
-      <Modal open={modal} onClose={() => setModal(false)} title="Add User" width={440}
-        footer={<><Button variant="secondary" onClick={() => setModal(false)}>Cancel</Button><Button variant="primary" onClick={handleAdd} loading={saving}>Create User</Button></>}>
-        <Input label="Full name" value={form.name} onChange={sf('name')} placeholder="Jane Smith" required />
-        <Input label="Email" type="email" value={form.email} onChange={sf('email')} placeholder="jane@example.com" required />
-        <Input label="Temporary password" type="password" value={form.password} onChange={sf('password')} placeholder="temp123" required />
-        <Select label="Role" value={form.role} onChange={sf('role')} options={[{ value: 'student', label: 'Student' }, { value: 'admin', label: 'Admin' }]} />
-      </Modal>
-      <Confirm open={!!delId} onClose={() => setDelId(null)} onConfirm={handleDelete} danger title="Delete user?" message="This will permanently delete this user account and cannot be undone." />
+      <Confirm open={!!delId} onClose={() => setDelId(null)} onConfirm={handleDelete} danger title="Delete user?" message="This removes the user's profile, enrollments and reviews. Their Firebase login is not deleted." />
     </div>
   );
 }
@@ -361,9 +361,8 @@ function Coupons() {
   async function handleCreate() {
     setSaving(true);
     try {
-      const fresh = { ...form, id: String(Date.now()), discount: Number(form.discount), maxUses: Number(form.maxUses), uses: 0, active: true, createdAt: new Date().toISOString().split('T')[0] };
-      await createCoupon(fresh);
-      setCoupons(prev => [...prev, fresh]);
+      const saved = await createCoupon(form);
+      setCoupons(prev => [saved, ...prev]);
       setModal(false); setForm({ code: '', discount: '', type: 'percent', maxUses: '', expires: '' });
       toast.success('Coupon created.');
     } catch (e) { toast.error(e.message); }
@@ -371,15 +370,20 @@ function Coupons() {
   }
 
   async function toggle(c) {
-    await updateCoupon(c.id, { ...c, active: !c.active });
-    setCoupons(prev => prev.map(x => x.id === c.id ? { ...x, active: !x.active } : x));
-    toast.success(`Coupon ${c.active ? 'deactivated' : 'activated'}.`);
+    try {
+      await updateCoupon(c.id, { ...c, active: !c.active });
+      setCoupons(prev => prev.map(x => x.id === c.id ? { ...x, active: !x.active } : x));
+      toast.success(`Coupon ${c.active ? 'deactivated' : 'activated'}.`);
+    } catch (e) { toast.error(e.message); }
   }
 
   async function handleDelete() {
-    await deleteCoupon(delId);
-    setCoupons(prev => prev.filter(x => x.id !== delId));
-    setDelId(null); toast.success('Coupon deleted.');
+    try {
+      await deleteCoupon(delId);
+      setCoupons(prev => prev.filter(x => x.id !== delId));
+      toast.success('Coupon deleted.');
+    } catch (e) { toast.error(e.message); }
+    finally { setDelId(null); }
   }
 
   return (
@@ -404,7 +408,7 @@ function Coupons() {
                   <span style={{ color: 'var(--text3)' }}>Usage</span><span style={{ fontWeight: 500 }}>{c.uses} / {c.maxUses}</span>
                 </div>
                 <div style={{ background: 'var(--bg3)', borderRadius: 99, height: 6 }}>
-                  <div style={{ width: `${Math.min((c.uses / c.maxUses) * 100, 100)}%`, height: 6, borderRadius: 99, background: 'var(--accent)' }} />
+                  <div style={{ width: `${Number.isFinite(c.maxUses) ? Math.min((c.uses / c.maxUses) * 100, 100) : 0}%`, height: 6, borderRadius: 99, background: 'var(--accent)' }} />
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text3)', marginTop: 5 }}>
                   <span>Created {c.createdAt}</span><span>Expires {c.expires}</span>

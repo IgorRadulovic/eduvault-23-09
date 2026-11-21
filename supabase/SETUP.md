@@ -1,71 +1,74 @@
-# Supabase Setup Guide
+# Supabase + Firebase Setup Guide
+
+**How it fits together**
+- **Firebase** handles sign-up / login (email + Google).
+- **Supabase** stores everything else: users' profiles and roles, products, orders, enrollments, coupons, reviews, files.
+- The browser sends the user's **Firebase ID token** with every Supabase request (Supabase "Third-Party Auth").
+  Row Level Security policies read the Firebase UID from it (`auth.jwt()->>'sub'`) to decide what each user may see.
 
 ## Your keys explained
 
-In Supabase → Settings → API you will see:
-- **Project URL** → this is `VITE_SUPABASE_URL`
-- **anon / public** key → this is `VITE_SUPABASE_ANON_KEY` (safe to use in browser)
-- **service_role** key → NEVER put this in the frontend. Keep it server-side only.
-
-So what you called "publishable" = anon key → goes in your .env.local
-What you called "secret" = service_role key → keep it safe, don't add to frontend
+In Supabase → Project Settings → API Keys:
+- **Project URL** → `VITE_SUPABASE_URL`
+- **anon / publishable** key → `VITE_SUPABASE_ANON_KEY` (safe in the browser)
+- **service_role / secret** key → NEVER put this in the frontend or in a `VITE_` variable.
 
 ## Step-by-step
 
-### 1. Add environment variables
-In `.env.local`:
+### 1. Firebase: enable sign-in methods and domains
+Firebase Console → Authentication:
+- **Sign-in method**: enable *Email/Password* and *Google*.
+- **Settings → Authorized domains**: add your Vercel domain(s), e.g. `your-site.vercel.app` and your custom domain.
+
+### 2. Supabase: trust your Firebase project
+Supabase Dashboard → **Authentication → Third-Party Auth** → *Add provider* → **Firebase** →
+enter your **Firebase Project ID** (Firebase Console → Project settings → General). Save.
+
+Without this step Supabase rejects the Firebase tokens and every logged-in request fails.
+
+> Optional: Supabase recommends adding a `role: "authenticated"` custom claim to Firebase users.
+> This app does **not** require it: the policies work for tokens with or without that claim.
+
+### 3. Run the schema
+Supabase → **SQL Editor** → New query → paste the whole of `schema.sql` → **Run**.
+
+It creates the tables, security policies, checkout/coupon functions, and the storage buckets
+(`product-images`, `course-videos`, `ebook-files`). It is safe to run again after changes.
+
+### 4. Environment variables
+Local `.env.local` (copy from `.env.local.example`) **and** Vercel → Project → Settings → Environment Variables:
 ```
 VITE_SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+VITE_SUPABASE_ANON_KEY=...
+VITE_FIREBASE_API_KEY=...
+VITE_FIREBASE_AUTH_DOMAIN=...
+VITE_FIREBASE_PROJECT_ID=...
+VITE_FIREBASE_APP_ID=...
+(+ the other VITE_FIREBASE_* values)
 ```
+After changing variables in Vercel, **redeploy**: Vite bakes them in at build time.
 
-In Vercel → Settings → Environment Variables: add same two values.
+### 5. Make yourself admin
+1. Sign up on the website once (this creates your row in `public.users`).
+2. In Supabase SQL Editor run:
+   ```sql
+   update public.users set role = 'admin' where email = 'you@example.com';
+   ```
+3. Sign out and back in → you'll be sent to `/admin`. From then on you can promote other users
+   in Admin → Users.
 
-### 2. Run the schema
-Go to Supabase → SQL Editor → New Query
-Paste the entire contents of `schema.sql` → click Run
+### 6. Add products
+Use Admin → Products → *Add Product* (tick **Published**), or submit through `/create`.
+Courses submitted by non-admins via `/create` are saved as **drafts**. An admin publishes them from
+Admin → Products → edit → tick *Published*.
 
-### 3. Create Storage Buckets
-Go to Supabase → Storage → New Bucket:
-- Name: `product-images`
-- Public bucket: ✅ YES (product thumbnails are public)
-- Click Create
+### 7. Verify
+- Logged out: homepage shows published products.
+- Sign up: a new row appears in `public.users` (Table Editor).
+- Add to cart → checkout: a row appears in `orders`, `order_items`, `enrollments`, and the item shows in **My Courses**.
 
-(Optional for ebook file delivery):
-- Name: `ebook-files`  
-- Public bucket: ❌ NO (private — only enrolled users)
-
-### 4. Set up RLS for Storage
-Go to Supabase → Storage → product-images → Policies → New Policy:
-
-**For SELECT (anyone can view):**
-- Policy name: `Public read`
-- Allowed operation: SELECT
-- Target roles: public (everyone)
-- USING expression: `true`
-
-**For INSERT (logged in users can upload):**
-- Policy name: `Auth upload`
-- Allowed operation: INSERT  
-- Target roles: authenticated
-- WITH CHECK expression: `true`
-
-### 5. Add seed products (optional)
-To pre-populate your database with demo courses, run the INSERT statements
-from your existing mockData.js adapted to SQL. Example:
-
-```sql
-INSERT INTO products (type, title, slug, author, price, original_price, description, is_published, is_featured, color)
-VALUES 
-  ('course', 'Complete React Developer 2024', 'complete-react-developer', 'Alex Rivera', 89, 149, 'Master React from zero to expert.', true, true, '#1565C0'),
-  ('ebook', 'The Future of AI in Business', 'future-of-ai-business', 'Dr. James Park', 24, 45, 'Practical AI frameworks for business leaders.', true, false, '#00695C');
-```
-
-You'll need to link to a category_id — first get category IDs:
-```sql
-SELECT id, name FROM categories;
-```
-
-### 6. Verify it works
-Run `npm run dev` — the homepage should now show products from your Supabase database.
-If it's empty, either add products via Admin Dashboard or run seed SQL above.
+## Checkout is in demo mode
+There is no payment provider yet. `place_order()` records the order as **completed** and grants access
+immediately, so anyone who signs in can enroll for free. Before going live, integrate Stripe: create the
+order as `pending`, and grant enrollments from a Stripe webhook running server-side (e.g. a Vercel
+Function using the service_role key).

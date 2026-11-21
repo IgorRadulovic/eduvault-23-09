@@ -3,7 +3,8 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  base: process.env.VITE_BASE_PATH || './',
+  // Absolute base: relative './' breaks deep links like /product/slug on refresh
+  base: process.env.VITE_BASE_PATH || '/',
 
   server: {
     port: 5173,

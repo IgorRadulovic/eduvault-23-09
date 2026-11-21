@@ -1,8 +1,13 @@
 // src/lib/supabase.js
 // Supabase client — fails gracefully if keys are not configured.
 // The app shows mock data instead of crashing.
+//
+// Auth: users sign in with Firebase. Every request carries the current
+// Firebase ID token (Supabase Third-Party Auth), so Row Level Security
+// policies know who the user is. Logged-out visitors fall back to the anon key.
 
 import { createClient } from '@supabase/supabase-js';
+import { auth } from './firebase';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -16,17 +21,18 @@ if (!SUPABASE_CONFIGURED && import.meta.env.DEV) {
   );
 }
 
+// Firebase refreshes the token automatically when it is close to expiry.
+export async function getFirebaseToken() {
+  return (await auth?.currentUser?.getIdToken()) ?? null;
+}
+
 // Even with placeholder values, createClient won't crash —
 // calls will just fail and fall through to mock data.
 export const supabase = createClient(
   supabaseUrl  ?? 'https://placeholder.supabase.co',
   supabaseKey  ?? 'placeholder-key',
   {
-    auth: {
-      persistSession:    false,
-      autoRefreshToken:  false,
-      detectSessionInUrl: false,
-    },
+    accessToken: getFirebaseToken,
     global: {
       // Silence Supabase's own error logs when not configured
       fetch: SUPABASE_CONFIGURED ? undefined : () => Promise.reject(new Error('Supabase not configured')),
