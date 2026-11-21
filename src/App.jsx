@@ -15,6 +15,7 @@ import CreateCoursePage from './pages/CreateCoursePage';
 import NotFound         from './pages/NotFound';
 import AdminDashboard   from './pages/admin/AdminDashboard';
 import { LoginPage, SignupPage, ForgotPasswordPage } from './pages/auth/AuthPages';
+import { useAutoReveal } from './hooks/useScrollReveal';
 
 if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
 
@@ -40,6 +41,7 @@ function Layout({ children }) {
 }
 
 export default function App() {
+  useAutoReveal();
   return (
     <>
       <ScrollToTop />

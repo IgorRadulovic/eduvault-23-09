@@ -168,7 +168,7 @@ function CouponPicker({ value, onChange }) {
 
 // ─── Main component ───────────────────────────
 export default function CreateCoursePage() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const nav = useNavigate();
   const imgRef  = useRef();
   const videoRef= useRef();
@@ -276,13 +276,19 @@ export default function CreateCoursePage() {
         congratsMessage: form.congratsMessage.trim(),
         pages:           form.type==='ebook' ? form.pages : undefined,
         format:          form.type==='ebook' ? form.format : undefined,
-        isPublished:     false,
+        // Admins publish directly; everyone else submits a draft for review
+        isPublished:     isAdmin,
         lastUpdated:     new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}),
       };
 
-      await createProduct(payload);
-      toast.success('🎉 Submitted! Our team will review and publish it shortly.');
-      nav('/my-courses');
+      const saved = await createProduct(payload);
+      if (isAdmin) {
+        toast.success('🎉 Published! It is now live on the site.');
+        nav(`/product/${saved.slug}`);
+      } else {
+        toast.success('🎉 Submitted! Our team will review and publish it shortly.');
+        nav('/my-courses');
+      }
     } catch (err) {
       toast.error(err.message);
     } finally { setSaving(false); }

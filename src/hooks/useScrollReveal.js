@@ -54,3 +54,33 @@ export function useStaggerChildren(options = {}) {
   }, []);
   return ref;
 }
+
+/**
+ * Site-wide: reveals every .reveal / .reveal-left / .reveal-right / .reveal-scale
+ * element as it scrolls into view, including ones rendered later (e.g. product
+ * cards that appear after data loads). Mount once in App.
+ */
+export function useAutoReveal() {
+  useEffect(() => {
+    const SEL = ['reveal', 'reveal-left', 'reveal-right', 'reveal-scale'].map(c => `.${c}:not(.revealed)`).join(',');
+    const reveal = el => el.classList.add('revealed');
+
+    if (noMotion() || !('IntersectionObserver' in window)) {
+      const all = () => document.querySelectorAll(SEL).forEach(reveal);
+      all();
+      const mo = new MutationObserver(all);
+      mo.observe(document.body, { childList: true, subtree: true });
+      return () => mo.disconnect();
+    }
+
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => { if (e.isIntersecting) { reveal(e.target); io.unobserve(e.target); } });
+    }, OBS_OPTIONS);
+    // observe() ignores elements it already watches, so rescanning is cheap
+    const scan = () => document.querySelectorAll(SEL).forEach(el => io.observe(el));
+    scan();
+    const mo = new MutationObserver(scan);
+    mo.observe(document.body, { childList: true, subtree: true });
+    return () => { mo.disconnect(); io.disconnect(); };
+  }, []);
+}
