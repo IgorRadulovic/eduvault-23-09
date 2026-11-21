@@ -2,14 +2,14 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth, toast } from '../context';
-import { getUserEnrollments, getEbookDownloadUrl } from '../api/services';
+import { getUserEnrollments, getEbookDownloadUrl, getProducts } from '../api/services';
 import { Button, EmptyState, Badge, Spinner } from '../components/ui';
 import SEO from '../components/layout/SEO';
 import ProductCover from '../components/courses/ProductCover';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 
 export default function MyCourses() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [enrollments, setEnrollments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(null);
@@ -24,10 +24,24 @@ export default function MyCourses() {
 
   useEffect(() => {
     if (!user?.id) return;
-    getUserEnrollments(user.id)
-      .then(data => { setEnrollments(data); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [user?.id]);
+    (async () => {
+      try {
+        const data = await getUserEnrollments(user.id);
+        // Admins can open every product (storage and the player allow it);
+        // list the ones they haven't bought, marked as admin access.
+        if (isAdmin) {
+          const owned = new Set(data.map(e => e.product_id));
+          const { products } = await getProducts({ limit: 200, includeDrafts: true });
+          products.filter(p => !owned.has(p.id)).forEach(p => data.push({
+            id: `admin-${p.id}`, adminAccess: true, progress: 0,
+            products: { id: p.id, title: p.title, slug: p.slug, type: p.type, image_url: p.image, color: p.color, author: p.author, ebook_file_url: p.ebookFileUrl, is_published: p.isPublished },
+          }));
+        }
+        setEnrollments(data);
+      } catch { /* empty state */ }
+      setLoading(false);
+    })();
+  }, [user?.id, isAdmin]);
 
   return (
     <main>
@@ -36,7 +50,9 @@ export default function MyCourses() {
         <div ref={headRef} style={{ marginBottom:36 }}>
           <h1 style={{ fontSize:34, marginBottom:8 }}>My Learning</h1>
           <p style={{ color:'var(--text2)', fontSize:15 }}>
-            {enrollments.length} item{enrollments.length !== 1 ? 's' : ''} enrolled
+            {isAdmin
+              ? `${enrollments.length} item${enrollments.length !== 1 ? 's' : ''} · as admin you can open every course and eBook`
+              : `${enrollments.length} item${enrollments.length !== 1 ? 's' : ''} enrolled`}
           </p>
         </div>
 
@@ -58,14 +74,16 @@ export default function MyCourses() {
                   onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='';}}>
                   <ProductCover product={{ title:p.title, image:p.image_url, color:p.color }} height={140} titleSize={20} />
                   <div style={{ padding:18 }}>
-                    <Badge variant={p.type==='ebook'?'info':'accent'} size="xs" style={{ marginBottom:10 }}>
-                      {p.type==='ebook'?'eBook':'Course'}
-                    </Badge>
+                    <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:10 }}>
+                      <Badge variant={p.type==='ebook'?'info':'accent'} size="xs">{p.type==='ebook'?'eBook':'Course'}</Badge>
+                      {enr.adminAccess && <Badge variant="gold" size="xs">Admin access</Badge>}
+                      {enr.adminAccess && p.is_published===false && <Badge variant="default" size="xs">Draft</Badge>}
+                    </div>
                     <h3 style={{ fontSize:15, fontWeight:600, marginBottom:6, lineHeight:1.4, color:'var(--text)' }}>{p.title}</h3>
                     <p style={{ fontSize:12, color:'var(--text3)', marginBottom:16 }}>by {p.author}</p>
 
-                    {/* Progress bar */}
-                    <div style={{ marginBottom:16 }}>
+                    {/* Progress bar (not tracked for admin access) */}
+                    {!enr.adminAccess && <div style={{ marginBottom:16 }}>
                       <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, color:'var(--text3)', marginBottom:5 }}>
                         <span>Progress</span>
                         <span style={{ fontWeight:600, color:enr.progress===100?'var(--success)':'var(--text2)' }}>
@@ -75,7 +93,7 @@ export default function MyCourses() {
                       <div style={{ background:'var(--bg3)', borderRadius:99, height:7, overflow:'hidden' }}>
                         <div style={{ width:`${enr.progress}%`, height:7, borderRadius:99, background: enr.progress===100?'var(--success)':'var(--accent)', transition:'width .6s var(--ease)' }} />
                       </div>
-                    </div>
+                    </div>}
                     {p.type==='ebook' ? (
                       <div style={{ display:'flex', gap:8 }}>
                         <Button variant="primary" size="sm" full disabled={!p.ebook_file_url} loading={downloading===p.id} onClick={()=>download(p)}>

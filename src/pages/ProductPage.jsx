@@ -12,7 +12,7 @@ import { fmt$, fmtN, disc, hasDiscount, priceLabel, plural } from '../utils/help
 export default function ProductPage() {
   const { slug } = useParams();
   const nav      = useNavigate();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { addItem, isInCart } = useCart();
   const [product, setProduct]     = useState(null);
   const [loading, setLoading]     = useState(true);
@@ -160,21 +160,23 @@ export default function ProductPage() {
 
           {/* ── Right: buy box, or "in your library" when owned ── */}
           <aside className="buy-box" style={{ flex: '1 1 320px', minWidth: 0, maxWidth: 400, position: 'sticky', top: 'calc(var(--header-h) + 20px)' }}>
-            {owned ? (
+            {owned || isAdmin ? (
               <div style={{ background: 'var(--bg2)', border: '1.5px solid var(--success-border)', borderRadius: 18, padding: 26, boxShadow: 'var(--shadow)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                   <span style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--success-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Icon name="check" size={18} stroke={2.6} color="var(--success)" />
                   </span>
-                  <span style={{ fontSize: 18, fontWeight: 700 }}>In your library</span>
+                  <span style={{ fontSize: 18, fontWeight: 700 }}>{owned ? 'In your library' : 'Admin access'}</span>
                 </div>
-                <p style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 20 }}>Purchased {new Date(owned.enrolled_at).toLocaleDateString()}</p>
+                <p style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 20 }}>
+                  {owned ? `Purchased ${new Date(owned.enrolled_at).toLocaleDateString()}` : 'Admins can open every course and eBook. Buyers see Buy now here.'}
+                </p>
                 {isEbook ? (
                   product.ebookFileUrl
                     ? <Button variant="success" size="lg" full loading={downloading} onClick={download}><Icon name="download" size={18} /> Download</Button>
                     : <p style={{ fontSize: 14, color: 'var(--text2)' }}>The author hasn’t uploaded the file yet. It will appear here and in My Courses.</p>
                 ) : (
-                  <Link to={`/learn/${product.slug}`}><Button variant="success" size="lg" full><Icon name="play" size={16} /> {owned.progress > 0 ? 'Continue learning' : 'Start course'}</Button></Link>
+                  <Link to={`/learn/${product.slug}`}><Button variant="success" size="lg" full><Icon name="play" size={16} /> {owned?.progress > 0 ? 'Continue learning' : owned ? 'Start course' : 'Open course player'}</Button></Link>
                 )}
                 {isEbook && <p style={{ fontSize: 13, color: 'var(--text2)', marginTop: 14, lineHeight: 1.6 }}>Download as often as you like. You’ll also find it in <Link to="/my-courses" style={{ color: 'var(--accent-text)', fontWeight: 600 }}>My Courses</Link>.</p>}
               </div>
