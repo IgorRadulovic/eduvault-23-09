@@ -102,9 +102,10 @@ async function denormalizeProduct(p) {
 }
 
 // includeDrafts: admin only — RLS still hides other people's drafts from everyone else.
-export async function getProducts({ type, category, search, page=1, limit=12, includeDrafts=false }={}) {
+export async function getProducts({ type, category, search, page=1, limit=12, includeDrafts=false, sort='popular' }={}) {
   try {
-    let q=supabase.from('products_with_category').select('*',{count:'exact'}).order('is_featured',{ascending:false}).order('student_count',{ascending:false});
+    let q=supabase.from('products_with_category').select('*',{count:'exact'});
+    q=sort==='newest' ? q.order('created_at',{ascending:false}) : q.order('is_featured',{ascending:false}).order('student_count',{ascending:false});
     if (!includeDrafts) q=q.eq('is_published',true);
     if (type&&type!=='all') q=q.eq('type',type);
     if (category&&category!=='All') q=q.eq('category_name',category);
@@ -211,8 +212,16 @@ export async function deleteCoupon(id) { const { error }=await supabase.from('co
 
 /* ── Enrollments ── */
 export async function getUserEnrollments(userId) {
-  const { data, error }=await supabase.from('enrollments').select('*, products(id,title,slug,type,image_url,color,author,description)').eq('user_id',userId).order('enrolled_at',{ascending:false});
+  const { data, error }=await supabase.from('enrollments').select('*, products(id,title,slug,type,image_url,color,author,description,ebook_file_url)').eq('user_id',userId).order('enrolled_at',{ascending:false});
   if (error) throw new Error(error.message); return data??[];
+}
+// The signed-in user's enrollment for one product, or null (not signed in / not bought).
+export async function getMyEnrollment(productId) {
+  const uid=auth?.currentUser?.uid;
+  if (!uid||!SUPABASE_CONFIGURED) return null;
+  const { data, error }=await supabase.from('enrollments').select('id,enrolled_at,order_id').eq('user_id',uid).eq('product_id',productId).maybeSingle();
+  if (error) { console.error('[Supabase]', error.message); return null; }
+  return data??null;
 }
 export async function enrollUser(userId, productId, orderId) {
   const { error }=await supabase.from('enrollments').upsert({ user_id:userId, product_id:productId, order_id:orderId, progress:0 },{ onConflict:'user_id,product_id' });
@@ -231,7 +240,7 @@ async function xhrUpload(bucket, path, file, onProgress, failMsg) {
     const xhr=new XMLHttpRequest(); xhr.open('POST',`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/${bucket}/${path}`);
     xhr.setRequestHeader('Authorization',`Bearer ${token}`);
     xhr.setRequestHeader('apikey',import.meta.env.VITE_SUPABASE_ANON_KEY);
-    xhr.setRequestHeader('Content-Type',file.type); xhr.setRequestHeader('x-upsert','false');
+    xhr.setRequestHeader('Content-Type',file.type||'application/octet-stream'); xhr.setRequestHeader('x-upsert','false');
     xhr.upload.onprogress=e=>{ if(e.lengthComputable) onProgress(Math.round((e.loaded/e.total)*100)); };
     xhr.onload=()=>xhr.status>=200&&xhr.status<300?resolve(path):reject(new Error(failMsg));
     xhr.onerror=()=>reject(new Error('Network error')); xhr.send(file);
@@ -256,10 +265,17 @@ export async function uploadEbookFile(file, onProgress) {
   const ext=file.name.split('.').pop().toLowerCase();
   const path=`ebooks/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
   if (onProgress) return xhrUpload('ebook-files',path,file,onProgress,'File upload failed');
-  const { error }=await supabase.storage.from('ebook-files').upload(path,file,{ upsert:false, contentType:file.type });
+  const { error }=await supabase.storage.from('ebook-files').upload(path,file,{ upsert:false, contentType:file.type||'application/octet-stream' });
   if (error) throw new Error('eBook upload failed: '+error.message); return path;
 }
-export async function getSignedUrl(bucket, path, expiresIn=3600) {
-  const { data, error }=await supabase.storage.from(bucket).createSignedUrl(path,expiresIn);
+export async function getSignedUrl(bucket, path, expiresIn=3600, options) {
+  const { data, error }=await supabase.storage.from(bucket).createSignedUrl(path,expiresIn,options);
   if (error) throw new Error('Could not generate download link: '+error.message); return data.signedUrl;
+}
+// Short-lived link; storage RLS only signs it for buyers, the uploader and admins.
+export async function getEbookDownloadUrl(path, title='ebook') {
+  const ext=path.split('.').pop();
+  const name=`${title.replace(/[^\w\s-]/g,'').trim().replace(/\s+/g,'-')||'ebook'}.${ext}`;
+  try { return await getSignedUrl('ebook-files',path,300,{ download:name }); }
+  catch { throw new Error('Download is not available. If you bought this ebook, please contact support.'); }
 }

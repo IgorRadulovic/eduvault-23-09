@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth, useTheme, useCart } from '../../context';
 import { Button } from '../ui';
+import Icon from '../ui/Icon';
 import { inits } from '../../utils/helpers';
 
 export default function Navbar() {
@@ -30,16 +31,15 @@ export default function Navbar() {
   ];
   const active = to => to==='/' ? loc.pathname==='/' : loc.pathname.startsWith(to);
 
-  function Logo({ height=38, white=false }) {
+  // logo.png is square with lots of padding; show just the book-and-lock mark, plus the name as text
+  function Logo() {
     return (
-      <img
-        src={white ? '/logo-white.png' : '/logo.png'}
-        alt="EduVault"
-        style={{ height, width:'auto', objectFit:'contain', display:'block' }}
-        onError={e => {
-          if (white) { e.target.src='/logo.png'; e.target.style.filter='brightness(0) invert(1)'; }
-        }}
-      />
+      <span style={{ display:'flex', alignItems:'center', gap:9 }}>
+        <span style={{ position:'relative', width:40, height:40, overflow:'hidden', display:'block', flexShrink:0 }}>
+          <img src="/logo.png" alt="" style={{ position:'absolute', width:88, maxWidth:'none', left:-24, top:-14 }} />
+        </span>
+        <span className="nav-wordmark" style={{ fontFamily:'Fraunces, serif', fontSize:22, fontWeight:700, letterSpacing:'-.3px', color:'var(--text)' }}>EduVault</span>
+      </span>
     );
   }
 
@@ -48,8 +48,8 @@ export default function Navbar() {
       <div className="page" style={{ height:'100%', display:'flex', alignItems:'center', gap:16 }}>
 
         {/* Logo */}
-        <Link to="/" style={{ flexShrink:0, display:'flex', alignItems:'center' }}>
-          <Logo height={38} />
+        <Link to="/" aria-label="EduVault home" style={{ flexShrink:0, display:'flex', alignItems:'center' }}>
+          <Logo />
         </Link>
 
         {/* Desktop links */}
@@ -76,12 +76,18 @@ export default function Navbar() {
             </Link>
           )}
 
+          {/* Prices are shown in USD everywhere */}
+          <span className="nav-currency" title="All prices are in US dollars"
+            style={{ height:38, padding:'0 10px', display:'flex', alignItems:'center', gap:6, border:'1px solid var(--border)', borderRadius:9, fontSize:13, fontWeight:600, color:'var(--text2)' }}>
+            <Icon name="globe" size={15} /> USD
+          </span>
+
           {/* Cart */}
-          <Link to="/cart"
+          <Link to="/cart" aria-label={`Cart${count ? `, ${count} items` : ''}`}
             style={{ position:'relative', width:38, height:38, display:'flex', alignItems:'center', justifyContent:'center', background:'var(--bg3)', border:'1px solid var(--border)', borderRadius:9, color:'var(--text2)', fontSize:17, flexShrink:0, transition:'all .18s' }}
             onMouseEnter={e=>{e.currentTarget.style.background='var(--accent-bg)';e.currentTarget.style.borderColor='var(--accent-border)';e.currentTarget.style.color='var(--accent)';}}
             onMouseLeave={e=>{e.currentTarget.style.background='var(--bg3)';e.currentTarget.style.borderColor='var(--border)';e.currentTarget.style.color='var(--text2)';}}>
-            🛒
+            <Icon name="cart" size={19} />
             {count>0 && <span style={{ position:'absolute', top:-6, right:-6, background:'var(--accent)', color:'#fff', borderRadius:99, width:18, height:18, fontSize:10, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', border:'2px solid var(--bg2)' }}>{count}</span>}
           </Link>
 
@@ -90,7 +96,7 @@ export default function Navbar() {
             style={{ width:38, height:38, display:'flex', alignItems:'center', justifyContent:'center', background:'var(--bg3)', border:'1px solid var(--border)', borderRadius:9, fontSize:16, transition:'all .18s' }}
             onMouseEnter={e=>{e.currentTarget.style.background='var(--accent-bg)';e.currentTarget.style.borderColor='var(--accent-border)';}}
             onMouseLeave={e=>{e.currentTarget.style.background='var(--bg3)';e.currentTarget.style.borderColor='var(--border)';}}>
-            {dark?'☀️':'🌙'}
+            <Icon name={dark ? 'sun' : 'moon'} size={18} color="var(--text2)" />
           </button>
 
           {/* User menu */}
@@ -116,15 +122,15 @@ export default function Navbar() {
                     <p style={{ fontSize:11, color:'var(--text3)' }}>{user.email}</p>
                   </div>
                   {[
-                    isAdmin && { to:'/admin', icon:'🛡', label:'Admin Dashboard' },
-                    { to:'/my-courses', icon:'📚', label:'My Courses' },
-                    { to:'/create', icon:'✏️', label:'Create Course / eBook' },
+                    isAdmin && { to:'/admin', icon:'shield', label:'Admin Dashboard' },
+                    { to:'/my-courses', icon:'book', label:'My Courses' },
+                    { to:'/create', icon:'plus', label:'Create Course / eBook' },
                   ].filter(Boolean).map(item => (
                     <Link key={item.to} to={item.to}
                       style={{ display:'flex', alignItems:'center', gap:9, padding:'9px 12px', borderRadius:8, fontSize:13, color:'var(--text2)', transition:'all .15s' }}
                       onMouseEnter={e=>{e.currentTarget.style.background='var(--accent-bg)';e.currentTarget.style.color='var(--accent)';}}
                       onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='var(--text2)';}}>
-                      {item.icon} {item.label}
+                      <Icon name={item.icon} size={16} /> {item.label}
                     </Link>
                   ))}
                   <div style={{ borderTop:'1px solid var(--border)', marginTop:6, paddingTop:6 }}>
@@ -132,7 +138,7 @@ export default function Navbar() {
                       style={{ display:'flex', alignItems:'center', gap:9, padding:'9px 12px', borderRadius:8, fontSize:13, color:'var(--danger)', background:'none', border:'none', cursor:'pointer', width:'100%', textAlign:'left', transition:'background .15s' }}
                       onMouseEnter={e=>e.currentTarget.style.background='var(--danger-bg)'}
                       onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                      → Sign Out
+                      <Icon name="logout" size={16} /> Sign Out
                     </button>
                   </div>
                 </div>
@@ -145,9 +151,9 @@ export default function Navbar() {
             </div>
           )}
 
-          <button onClick={()=>setMob(m=>!m)} className="mob-menu-btn"
+          <button onClick={()=>setMob(m=>!m)} className="mob-menu-btn" aria-label={mob ? 'Close menu' : 'Open menu'}
             style={{ display:'none', width:38, height:38, alignItems:'center', justifyContent:'center', background:'var(--bg3)', border:'1px solid var(--border)', borderRadius:9, fontSize:18 }}>
-            {mob?'✕':'☰'}
+            <Icon name={mob ? 'close' : 'menu'} size={20} color="var(--text2)" />
           </button>
         </div>
       </div>
@@ -169,7 +175,7 @@ export default function Navbar() {
         </div>
       )}
 
-      <style>{`@media(max-width:768px){.desktop-nav{display:none!important}.mob-menu-btn{display:flex!important}}`}</style>
+      <style>{`@media(max-width:768px){.desktop-nav{display:none!important}.mob-menu-btn{display:flex!important}.nav-currency{display:none!important}}@media(max-width:420px){.nav-wordmark{display:none}}`}</style>
     </nav>
   );
 }

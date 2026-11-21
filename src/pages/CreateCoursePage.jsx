@@ -2,7 +2,8 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth, toast } from '../context';
-import { createProduct, uploadProductImage } from '../api/services';
+import { createProduct, uploadProductImage, uploadEbookFile } from '../api/services';
+import EbookFileInput from '../components/courses/EbookFileInput';
 import { Button, Input, Select, Textarea } from '../components/ui';
 import SEO from '../components/layout/SEO';
 
@@ -177,6 +178,8 @@ export default function CreateCoursePage() {
   const [saving, setSaving] = useState(false);
   const [imgFile,  setImgFile]  = useState(null);
   const [imgPrev,  setImgPrev]  = useState('');
+  const [ebookFile, setEbookFile] = useState(null);
+  const [uploadPct, setUploadPct] = useState(null);
   const [errors, setErrors]     = useState({});
 
   const [form, setForm] = useState({
@@ -223,6 +226,7 @@ export default function CreateCoursePage() {
 
   function validate(s) {
     const e={};
+    if (s===1&&form.type==='ebook'&&!ebookFile) e.ebookFile = 'Upload the ebook file buyers will download.';
     if (s===2) {
       if (!form.title.trim())       e.title       = 'Course title is required.';
       if (!form.description.trim()) e.description = 'Short description is required.';
@@ -246,12 +250,20 @@ export default function CreateCoursePage() {
 
   async function handleSubmit() {
     if (!validate(step)) return;
+    if (form.type==='ebook'&&!ebookFile) { setStep(1); validate(1); return; }
     setSaving(true);
     try {
       let imageUrl = '';
       if (imgFile) {
         try { imageUrl = await uploadProductImage(imgFile); }
         catch (err) { toast.warning('Image upload failed — submitting without image.'); }
+      }
+
+      // Unlike the image, the ebook file is essential — stop if it fails
+      let ebookFileUrl = null;
+      if (form.type==='ebook') {
+        setUploadPct(0);
+        ebookFileUrl = await uploadEbookFile(ebookFile, setUploadPct);
       }
 
       const payload = {
@@ -276,6 +288,8 @@ export default function CreateCoursePage() {
         congratsMessage: form.congratsMessage.trim(),
         pages:           form.type==='ebook' ? form.pages : undefined,
         format:          form.type==='ebook' ? form.format : undefined,
+        ebookFileUrl,
+        ebookFileSize:   ebookFile?.size ?? null,
         // Admins publish directly; everyone else submits a draft for review
         isPublished:     isAdmin,
         lastUpdated:     new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'}),
@@ -291,7 +305,7 @@ export default function CreateCoursePage() {
       }
     } catch (err) {
       toast.error(err.message);
-    } finally { setSaving(false); }
+    } finally { setSaving(false); setUploadPct(null); }
   }
 
   const currStep = STEPS[step];
@@ -388,6 +402,10 @@ export default function CreateCoursePage() {
                 <SectionTitle sub={form.type==='ebook'?'Outline the chapters and sections of your ebook.':'Plan your course structure with sections and lectures.'}>
                   {form.type==='ebook'?'eBook Structure':'Course Curriculum'}
                 </SectionTitle>
+                {form.type==='ebook'&&(
+                  <EbookFileInput file={ebookFile} error={errors.ebookFile} progress={uploadPct}
+                    onChange={f=>{ setEbookFile(f); setErrors(e=>({...e,ebookFile:''})); }} />
+                )}
                 <CurriculumBuilder value={form.curriculum} onChange={v=>sf('curriculum',v)} />
                 {form.curriculum.length===0&&(
                   <InfoBox>Start by adding a section (e.g. "Introduction"), then add lectures inside it. You can always edit this later.</InfoBox>
@@ -556,7 +574,7 @@ export default function CreateCoursePage() {
               <div style={{ display:'flex', gap:12 }}>
                 {step < STEPS.length-1
                   ? <Button variant="primary" onClick={next}>Save & Continue →</Button>
-                  : <Button variant="primary" onClick={handleSubmit} loading={saving}>🚀 Submit for Review</Button>
+                  : <Button variant="primary" onClick={handleSubmit} loading={saving}>{uploadPct!==null?`Uploading file… ${uploadPct}%`:isAdmin?'🚀 Publish':'🚀 Submit for Review'}</Button>
                 }
               </div>
             </div>

@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { useAuth, useTheme, toast } from '../../context';
 import {
   getOrderStats, getOrders, getUsers, getCoupons, getProducts,
-  createProduct, updateProduct, deleteProduct,
+  createProduct, updateProduct, deleteProduct, uploadEbookFile,
   updateUserRole, updateUserStatus, deleteUser,
   createCoupon, updateCoupon, deleteCoupon,
 } from '../../api/services';
@@ -14,6 +14,7 @@ import {
   Confirm, StatCard, Spinner, Table,
 } from '../../components/ui';
 import { fmt$, fmtN, inits } from '../../utils/helpers';
+import EbookFileInput from '../../components/courses/EbookFileInput';
 
 const TABS = [
   { id: 'overview', icon: '📈', label: 'Overview' },
@@ -150,13 +151,16 @@ function Products() {
   const [delId, setDelId] = useState(null);
   const [delLoading, setDelLoad] = useState(false);
   const [typeFilter, setTypeFilter] = useState('all');
+  const [ebookFile, setEbookFile] = useState(null);
+  const [uploadPct, setUploadPct] = useState(null);
   const sf = k => v => setForm(f => ({ ...f, [k]: v }));
 
   useEffect(() => { getProducts({ limit: 200, includeDrafts: true }).then(d => { setItems(d.products); setLoading(false); }); }, []);
 
-  function openAdd() { setEditing(null); setForm(EMPTY_P); setModal(true); }
+  function openAdd() { setEditing(null); setForm(EMPTY_P); setEbookFile(null); setModal(true); }
   function openEdit(item) {
     setEditing(item);
+    setEbookFile(null);
     setForm({ ...item, price: String(item.price), originalPrice: String(item.originalPrice), lessons: String(item.lessons ?? ''), pages: String(item.pages ?? ''), tags: (item.tags ?? []).join(', ') });
     setModal(true);
   }
@@ -166,6 +170,11 @@ function Products() {
     setSaving(true);
     const payload = { ...form, price: Number(form.price), originalPrice: Number(form.originalPrice), lessons: Number(form.lessons) || undefined, pages: Number(form.pages) || undefined, tags: form.tags.split(',').map(t => t.trim()).filter(Boolean) };
     try {
+      if (form.type === 'ebook' && ebookFile) {
+        setUploadPct(0);
+        payload.ebookFileUrl = await uploadEbookFile(ebookFile, setUploadPct);
+        payload.ebookFileSize = ebookFile.size;
+      }
       if (editing) {
         const saved = await updateProduct(editing.id, payload);
         setItems(i => i.map(x => x.id === editing.id ? saved : x));
@@ -177,7 +186,7 @@ function Products() {
       }
       setModal(false);
     } catch (e) { toast.error(e.message); }
-    finally { setSaving(false); }
+    finally { setSaving(false); setUploadPct(null); }
   }
 
   async function handleDelete() {
@@ -218,7 +227,7 @@ function Products() {
         </div>
       )}
       <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Edit Product' : 'Add Product'} width={600}
-        footer={<><Button variant="secondary" onClick={() => setModal(false)}>Cancel</Button><Button variant="primary" onClick={handleSave} loading={saving}>{editing ? 'Save Changes' : 'Create Product'}</Button></>}>
+        footer={<><Button variant="secondary" onClick={() => setModal(false)}>Cancel</Button><Button variant="primary" onClick={handleSave} loading={saving}>{uploadPct !== null ? `Uploading… ${uploadPct}%` : editing ? 'Save Changes' : 'Create Product'}</Button></>}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
           <Input label="Title" value={form.title} onChange={sf('title')} placeholder="Course title" required style={{ gridColumn: '1/-1' }} />
           <Input label="Author" value={form.author} onChange={sf('author')} placeholder="Author name" required />
@@ -235,6 +244,9 @@ function Products() {
           {form.type === 'ebook' && <>
             <Input label="Pages" value={form.pages} onChange={sf('pages')} placeholder="200" />
             <Input label="Formats" value={form.format} onChange={sf('format')} placeholder="PDF + ePub" />
+            <div style={{ gridColumn: '1/-1' }}>
+              <EbookFileInput file={ebookFile} currentPath={form.ebookFileUrl} onChange={setEbookFile} progress={uploadPct} />
+            </div>
           </>}
           <Input label="Tags (comma-separated)" value={form.tags} onChange={sf('tags')} placeholder="React, JavaScript" style={{ gridColumn: '1/-1' }} />
           <Textarea label="Description" value={form.description} onChange={sf('description')} placeholder="Short description…" rows={3} />

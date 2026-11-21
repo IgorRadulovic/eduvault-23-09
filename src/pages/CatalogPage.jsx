@@ -6,6 +6,9 @@ import { CATEGORIES } from '../api/mockData';
 import ProductCard from '../components/courses/ProductCard';
 import { Spinner, EmptyState, Button } from '../components/ui';
 import SEO from '../components/layout/SEO';
+import { plural } from '../utils/helpers';
+
+const SORTS = [['popular','Most Popular'],['rating','Highest Rated'],['price-asc','Price: Low → High'],['price-desc','Price: High → Low']];
 
 function useReveal() {
   const ref = useRef(null);
@@ -54,7 +57,7 @@ export default function CatalogPage({ type }) {
         <div ref={headRef} style={{ marginBottom:32 }}>
           <h1 style={{ fontSize:36, marginBottom:8 }}>{typeLabel}</h1>
           <p style={{ color:'var(--text2)', fontSize:15 }}>
-            {total} {typeLabel.toLowerCase()} available
+            {type==='ebook' ? plural(total,'eBook') : type==='course' ? plural(total,'course') : plural(total,'product')}
             {params.get('q') && <> · Results for "<strong>{params.get('q')}</strong>"</>}
           </p>
         </div>
@@ -73,7 +76,7 @@ export default function CatalogPage({ type }) {
             </div>
             <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:14, padding:'18px 16px' }}>
               <p style={{ fontSize:12, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.7px', marginBottom:14 }}>Sort by</p>
-              {[['popular','Most Popular'],['rating','Highest Rated'],['price-asc','Price: Low → High'],['price-desc','Price: High → Low']].map(([v,l]) => (
+              {SORTS.map(([v,l]) => (
                 <button key={v} onClick={()=>setSort(v)}
                   style={{ display:'block', width:'100%', textAlign:'left', padding:'8px 10px', borderRadius:8, border:'none', background:sort===v?'var(--accent-bg)':'transparent', color:sort===v?'var(--accent)':'var(--text2)', fontSize:14, fontWeight:sort===v?600:400, cursor:'pointer', marginBottom:2, transition:'all .15s' }}>
                   {l}
@@ -84,12 +87,30 @@ export default function CatalogPage({ type }) {
 
           {/* Grid */}
           <div style={{ flex:1, minWidth:0 }}>
+            {/* Phones: the sidebar is hidden, so filters become a chip row + sort menu */}
+            <div className="catalog-mobile-filters" style={{ display:'none', flexDirection:'column', gap:12, marginBottom:20 }}>
+              <div style={{ display:'flex', gap:8, overflowX:'auto', paddingBottom:4, margin:'0 -16px', padding:'0 16px 4px' }}>
+                {['All',...CATEGORIES.filter(c=>c!=='All')].map(c => (
+                  <button key={c} type="button" onClick={()=>setCategory(c)}
+                    style={{ flexShrink:0, height:40, padding:'0 16px', borderRadius:99, fontSize:14, fontWeight:category===c?600:500, border:`1px solid ${category===c?'var(--accent)':'var(--border)'}`, background:category===c?'var(--accent)':'var(--bg2)', color:category===c?'#fff':'var(--text2)' }}>
+                    {c}
+                  </button>
+                ))}
+              </div>
+              <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:14, color:'var(--text2)' }}>
+                Sort:
+                <select value={sort} onChange={e=>setSort(e.target.value)}
+                  style={{ height:40, padding:'0 10px', borderRadius:10, border:'1px solid var(--border)', background:'var(--bg2)', color:'var(--text)', fontSize:14, fontWeight:600 }}>
+                  {SORTS.map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </label>
+            </div>
             {loading ? (
               <div style={{ display:'flex', justifyContent:'center', padding:'80px 0' }}><Spinner size={40} /></div>
             ) : products.length === 0 ? (
               <EmptyState emoji="🔍" title="Nothing found" subtitle="Try a different category or search term." />
             ) : (
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:22 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(270px,1fr))', gap:22 }}>
                 {products.map((p,i) => (
                   <div key={p.id} className={`reveal delay-${Math.min((i%6)+1,6)}`}>
                     <ProductCard product={p} />
@@ -100,7 +121,7 @@ export default function CatalogPage({ type }) {
           </div>
         </div>
       </div>
-      <style>{`@media(max-width:720px){aside{display:none}}`}</style>
+      <style>{`@media(max-width:720px){aside{display:none}.catalog-mobile-filters{display:flex!important}}`}</style>
     </main>
   );
 }

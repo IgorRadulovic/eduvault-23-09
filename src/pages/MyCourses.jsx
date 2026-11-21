@@ -1,17 +1,26 @@
 // src/pages/MyCourses.jsx
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../context';
-import { getUserEnrollments } from '../api/services';
+import { useAuth, toast } from '../context';
+import { getUserEnrollments, getEbookDownloadUrl } from '../api/services';
 import { Button, EmptyState, Badge, Spinner } from '../components/ui';
 import SEO from '../components/layout/SEO';
+import ProductCover from '../components/courses/ProductCover';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 
 export default function MyCourses() {
   const { user } = useAuth();
   const [enrollments, setEnrollments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(null);
   const headRef = useScrollReveal();
+
+  async function download(p) {
+    setDownloading(p.id);
+    try { window.location.href = await getEbookDownloadUrl(p.ebook_file_url, p.title); }
+    catch (e) { toast.error(e.message); }
+    finally { setDownloading(null); }
+  }
 
   useEffect(() => {
     if (!user?.id) return;
@@ -47,17 +56,10 @@ export default function MyCourses() {
                   style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:16, overflow:'hidden', transition:'all .26s var(--ease)' }}
                   onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-4px)';e.currentTarget.style.boxShadow='var(--shadow-lg)';}}
                   onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='';}}>
-                  <div style={{ height:120, overflow:'hidden', position:'relative' }}>
-                    {p.image_url ? (
-                      <img src={p.image_url} alt={p.title} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-                    ) : (
-                      <div style={{ width:'100%', height:'100%', background:`${p.color??'#1565C0'}22`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:44 }}>📚</div>
-                    )}
-                    <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(13,27,42,.5) 0%, transparent 60%)' }} />
-                  </div>
+                  <ProductCover product={{ title:p.title, image:p.image_url, color:p.color }} height={140} titleSize={20} />
                   <div style={{ padding:18 }}>
                     <Badge variant={p.type==='ebook'?'info':'accent'} size="xs" style={{ marginBottom:10 }}>
-                      {p.type==='ebook'?'📖 eBook':'🎥 Course'}
+                      {p.type==='ebook'?'eBook':'Course'}
                     </Badge>
                     <h3 style={{ fontSize:15, fontWeight:600, marginBottom:6, lineHeight:1.4, color:'var(--text)' }}>{p.title}</h3>
                     <p style={{ fontSize:12, color:'var(--text3)', marginBottom:16 }}>by {p.author}</p>
@@ -74,11 +76,20 @@ export default function MyCourses() {
                         <div style={{ width:`${enr.progress}%`, height:7, borderRadius:99, background: enr.progress===100?'var(--success)':'var(--accent)', transition:'width .6s var(--ease)' }} />
                       </div>
                     </div>
-                    <Link to={`/product/${p.slug}`}>
-                      <Button variant={enr.progress===100?'success':'primary'} size="sm" full>
-                        {enr.progress===100?'✓ Review Course':'Continue Learning →'}
-                      </Button>
-                    </Link>
+                    {p.type==='ebook' ? (
+                      <div style={{ display:'flex', gap:8 }}>
+                        <Button variant="primary" size="sm" full disabled={!p.ebook_file_url} loading={downloading===p.id} onClick={()=>download(p)}>
+                          {p.ebook_file_url ? '⬇ Download' : 'File coming soon'}
+                        </Button>
+                        <Link to={`/product/${p.slug}`}><Button variant="secondary" size="sm">Details</Button></Link>
+                      </div>
+                    ) : (
+                      <Link to={`/product/${p.slug}`}>
+                        <Button variant={enr.progress===100?'success':'primary'} size="sm" full>
+                          {enr.progress===100?'✓ Review Course':'Continue Learning →'}
+                        </Button>
+                      </Link>
+                    )}
                   </div>
                 </div>
               );
